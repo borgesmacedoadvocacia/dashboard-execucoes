@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Planilha de Execuções | Borges Macedo</title>
+<link rel="icon" type="image/png" href="favicon.png" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  * { -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #0f1117;
+    --bg2: #161b26;
+    --bg3: #1e2536;
+    --bg4: #232c42;
+    --azul: #2563eb;
+    --azul-claro: #3b82f6;
+    --verde: #22c55e;
+    --verde-fraco: rgba(34,197,94,0.13);
+    --vermelho: #ef4444;
+    --vermelho-fraco: rgba(239,68,68,0.13);
+    --amarelo: #f59e0b;
+    --amarelo-fraco: rgba(245,158,11,0.13);
+    --roxo: #a855f7;
+    --ciano: #06b6d4;
+    --texto: #e2e8f0;
+    --texto-muted: #64748b;
+    --borda: #1e2d4a;
+    --radius: 12px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  html { font-size: 15px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--texto);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    padding-bottom: 3rem;
+    overflow-x: hidden;
+  }
+
+  /* ===== CABEÇALHO ===== */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 1rem;
+    padding: 1rem 1.75rem;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--borda);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-logo { display: flex; align-items: center; gap: 0.75rem; }
+  .logo-img { height: 38px; width: auto; object-fit: contain; }
+  .logo-text { display: flex; flex-direction: column; line-height: 1.2; }
+  .logo-name { font-size: 0.95rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .logo-sub { font-size: 0.63rem; color: var(--texto-muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; }
+  .header-updated { font-size: 0.72rem; color: var(--texto-muted); }
+  .btn-atualizar {
+    display: flex; align-items: center; gap: 0.4rem;
+    padding: 0.4rem 0.85rem; background: transparent;
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+    color: var(--texto); font-size: 0.8rem; font-weight: 500;
+    cursor: pointer; font-family: inherit; transition: background .15s, border-color .15s;
+  }
+  .btn-atualizar:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.3); }
+
+  /* ===== LAYOUT ===== */
+  .container { max-width: 1500px; margin: 0 auto; padding: 1.5rem 1.75rem; }
+  .secao { margin-bottom: 2rem; }
+  .secao-titulo {
+    display: flex; align-items: center; gap: 0.6rem;
+    font-size: 0.95rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 0.35rem;
+  }
+  .secao-titulo::before { content: ''; width: 3px; height: 17px; background: var(--azul-claro); border-radius: 2px; }
+  .secao-sub { font-size: 0.78rem; color: var(--texto-muted); margin-bottom: 1rem; margin-left: 0.9rem; }
+
+  .card {
+    background: var(--bg2); border: 1px solid var(--borda);
+    border-radius: var(--radius); padding: 1.15rem; box-shadow: var(--shadow);
+  }
+
+  /* ===== KPIs ===== */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.9rem; }
+  .kpi { position: relative; overflow: hidden; }
+  .kpi::after { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--azul-claro); }
+  .kpi.verde::after { background: var(--verde); }
+  .kpi.vermelho::after { background: var(--vermelho); }
+  .kpi.amarelo::after { background: var(--amarelo); }
+  .kpi.roxo::after { background: var(--roxo); }
+  .kpi-topo { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.55rem; }
+  .kpi-nome { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--texto-muted); font-weight: 700; }
+  .kpi-pct {
+    font-size: 0.72rem; font-weight: 800; padding: 0.15rem 0.45rem; border-radius: 6px; white-space: nowrap;
+  }
+  .kpi-pct.verde { background: var(--verde-fraco); color: var(--verde); }
+  .kpi-pct.vermelho { background: var(--vermelho-fraco); color: var(--vermelho); }
+  .kpi-pct.amarelo { background: var(--amarelo-fraco); color: var(--amarelo); }
+  .kpi-pct.neutro { background: var(--bg3); color: var(--texto-muted); }
+  .kpi-valor { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+  .kpi-rodape { margin-top: 0.6rem; padding-top: 0.55rem; border-top: 1px solid var(--borda); font-size: 0.75rem; color: var(--texto-muted); display:flex; flex-direction:column; gap:.2rem; }
+  .kpi-rodape span b { color: var(--texto); font-weight: 600; }
+
+  /* ===== BARRA DE PROGRESSO ===== */
+  .barra-fundo { height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; margin-top: .5rem; }
+  .barra-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+
+  /* ===== TABELAS ===== */
+  .tabela-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.83rem; min-width: 640px; }
+  thead th {
+    text-align: right; padding: 0.6rem 0.7rem; font-size: 0.67rem; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--texto-muted); font-weight: 700;
+    border-bottom: 1px solid var(--borda); white-space: nowrap; background: var(--bg2);
+    position: sticky; top: 0;
+  }
+  thead th:first-child { text-align: left; }
+  tbody td { padding: 0.55rem 0.7rem; text-align: right; border-bottom: 1px solid rgba(30,45,74,0.5); white-space: nowrap; }
+  tbody td:first-child { text-align: left; white-space: normal; }
+  tbody tr.destaque { background: rgba(255,255,255,0.04); }
+  tbody tr.destaque td { font-weight: 800; border-top: 1px solid var(--borda); }
+  .tag-pct { font-weight: 800; padding: 0.1rem 0.5rem; border-radius: 5px; font-size: 0.76rem; display:inline-block; }
+  .tag-pct.verde { background: var(--verde-fraco); color: var(--verde); }
+  .tag-pct.vermelho { background: var(--vermelho-fraco); color: var(--vermelho); }
+  .tag-pct.amarelo { background: var(--amarelo-fraco); color: var(--amarelo); }
+  .tag-pct.neutro { background: var(--bg3); color: var(--texto-muted); }
+  .val-neg { color: var(--vermelho); font-weight: 600; }
+  .val-pos { color: var(--verde); font-weight: 600; }
+
+  /* ===== GRÁFICOS ===== */
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(370px, 1fr)); gap: 1rem; }
+  .grafico-box { position: relative; width: 100%; }
+  .grafico-box.alto { height: 360px; }
+  .grafico-box.medio { height: 300px; }
+
+  /* ===== RESUMO POR ABA ===== */
+  .resumo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.9rem; margin-bottom: 1rem; }
+  .resumo-item { background: var(--bg3); border: 1px solid var(--borda); border-radius: 10px; padding: 0.9rem; }
+  .resumo-nome { font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texto-muted); font-weight: 700; margin-bottom: 0.35rem; }
+  .resumo-valor { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; }
+  .resumo-nota { font-size: 0.71rem; color: var(--texto-muted); margin-top: 0.25rem; }
+
+  /* ===== OBSERVAÇÕES ===== */
+  .obs-lista { display: flex; flex-direction: column; gap: 0.6rem; }
+  .obs {
+    display: flex; gap: 0.75rem; padding: 0.8rem 0.95rem;
+    background: var(--bg3); border-radius: 10px;
+    border-left: 3px solid var(--texto-muted);
+  }
+  .obs.critico { border-left-color: var(--vermelho); background: rgba(239,68,68,0.07); }
+  .obs.atencao { border-left-color: var(--amarelo); background: rgba(245,158,11,0.06); }
+  .obs.bom { border-left-color: var(--verde); background: rgba(34,197,94,0.06); }
+  .obs.info { border-left-color: var(--azul-claro); }
+  .obs-icone { font-size: 1rem; line-height: 1.35; flex-shrink: 0; }
+  .obs-corpo { flex: 1; min-width: 0; }
+  .obs-titulo { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.15rem; }
+  .obs-texto { font-size: 0.8rem; color: var(--texto-muted); line-height: 1.5; }
+  .obs-texto b { color: var(--texto); font-weight: 600; }
+  .obs-vazio { padding: 1.5rem; text-align: center; color: var(--texto-muted); font-size: 0.85rem; }
+
+  /* ===== ESTADOS ===== */
+  .estado { padding: 3rem 1.5rem; text-align: center; color: var(--texto-muted); }
+  .spinner {
+    width: 34px; height: 34px; margin: 0 auto 1rem;
+    border: 3px solid var(--bg3); border-top-color: var(--azul-claro);
+    border-radius: 50%; animation: girar .8s linear infinite;
+  }
+  @keyframes girar { to { transform: rotate(360deg); } }
+  .erro-box {
+    background: rgba(239,68,68,0.1); border: 1px solid var(--vermelho);
+    border-radius: var(--radius); padding: 1rem; margin: 1rem 1.75rem;
+    color: #fca5a5; font-size: 0.85rem; line-height: 1.5;
+  }
+  .oculto { display: none !important; }
+
+  .rodape { text-align: center; font-size: 0.72rem; color: var(--texto-muted); padding: 1.5rem; line-height: 1.7; }
+  .rodape a { color: var(--azul-claro); text-decoration: none; }
+
+  /* ===== TELA DE LOGIN ===== */
+  .login-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: radial-gradient(circle at 50% 0%, #1a2338 0%, var(--bg) 62%);
+    display: flex; align-items: center; justify-content: center; padding: 1.25rem;
+  }
+  .login-caixa {
+    width: 100%; max-width: 372px;
+    background: var(--bg2); border: 1px solid var(--borda);
+    border-radius: 16px; padding: 2rem 1.75rem;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+  }
+  .login-logo { display: block; height: 46px; margin: 0 auto 1.15rem; object-fit: contain; }
+  .login-titulo { text-align: center; font-size: 1.02rem; font-weight: 700; letter-spacing: 0.02em; }
+  .login-sub {
+    text-align: center; font-size: 0.72rem; color: var(--texto-muted);
+    text-transform: uppercase; letter-spacing: 0.1em; margin-top: 0.25rem; margin-bottom: 1.6rem;
+  }
+  .campo-grupo { margin-bottom: 0.9rem; }
+  .campo-rotulo {
+    display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--texto-muted); font-weight: 700; margin-bottom: 0.35rem;
+  }
+  .campo-texto {
+    width: 100%; background: var(--bg3); border: 1px solid var(--borda);
+    color: var(--texto); border-radius: 9px; padding: 0.68rem 0.85rem;
+    font-size: 0.92rem; font-family: inherit; outline: none; transition: border-color .15s;
+  }
+  .campo-texto:focus { border-color: var(--azul-claro); }
+  .campo-texto::placeholder { color: #47536b; }
+  .btn-entrar {
+    width: 100%; margin-top: 0.5rem; padding: 0.72rem;
+    background: var(--azul); border: none; border-radius: 9px;
+    color: #fff; font-size: 0.92rem; font-weight: 700; font-family: inherit;
+    cursor: pointer; transition: background .15s;
+  }
+  .btn-entrar:hover:not(:disabled) { background: var(--azul-claro); }
+  .btn-entrar:disabled { opacity: 0.6; cursor: default; }
+  .login-erro {
+    margin-top: 0.9rem; padding: 0.6rem 0.75rem; border-radius: 8px;
+    background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.45);
+    color: #fca5a5; font-size: 0.79rem; line-height: 1.45; text-align: center;
+  }
+  .login-rodape {
+    margin-top: 1.35rem; padding-top: 1rem; border-top: 1px solid var(--borda);
+    font-size: 0.7rem; color: var(--texto-muted); text-align: center; line-height: 1.55;
+  }
+  .btn-sair {
+    background: transparent; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+    color: var(--texto-muted); font-size: 0.75rem; font-family: inherit;
+    padding: 0.3rem 0.6rem; cursor: pointer; transition: all .15s;
+  }
+  .btn-sair:hover { color: var(--vermelho); border-color: var(--vermelho); }
+
+  @media (max-width: 720px) {
+    html { font-size: 14px; }
+    .header { padding: 0.85rem 1rem; }
+    .container { padding: 1.1rem 1rem; }
+    .kpi-valor { font-size: 1.3rem; }
+    .grafico-box.alto { height: 300px; }
+    .grafico-box.medio { height: 260px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="login-overlay" id="loginOverlay">
+  <form class="login-caixa" id="loginForm" autocomplete="on">
+    <img src="logo.png" alt="Borges Macedo Advocacia" class="login-logo" onerror="this.style.display='none'" />
+    <div class="login-titulo">Planilha de Execuções</div>
+    <div class="login-sub">Acesso restrito</div>
+
+    <div class="campo-grupo">
+      <label class="campo-rotulo" for="campoUsuario">Login</label>
+      <input class="campo-texto" type="text" id="campoUsuario" name="username"
+             autocomplete="username" placeholder="Usuário" required />
+    </div>
+    <div class="campo-grupo">
+      <label class="campo-rotulo" for="campoSenha">Senha</label>
+      <input class="campo-texto" type="password" id="campoSenha" name="password"
+             autocomplete="current-password" placeholder="••••••••" required />
+    </div>
+
+    <button type="submit" class="btn-entrar" id="btnEntrar">Entrar</button>
+    <div class="login-erro oculto" id="loginErro"></div>
+
+    <div class="login-rodape">
+      Os dados desta página são liberados pela sua senha.<br />
+      A sessão termina ao fechar a aba.
+    </div>
+  </form>
+</div>
+
+<header class="header oculto" id="cabecalho">
+  <div class="header-logo">
+    <img src="logo.png" alt="Borges Macedo Advocacia" class="logo-img" onerror="this.style.display='none'" />
+    <div class="logo-text">
+      <span class="logo-name">Execuções</span>
+      <span class="logo-sub">Borges Macedo Advocacia · Planilha de Execuções</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div style="display:flex;gap:.4rem;align-items:center">
+      <button class="btn-atualizar" id="btnAtualizar">&#10227; Atualizar</button>
+      <button class="btn-sair" id="btnSair" title="Encerrar a sessão">Sair</button>
+    </div>
+    <span class="header-updated" id="atualizadoEm">—</span>
+  </div>
+</header>
+
+<div id="erroBox" class="erro-box oculto"></div>
+
+<div id="carregando" class="estado oculto">
+  <div class="spinner"></div>
+  Carregando dados da planilha…
+</div>
+
+<main class="container oculto" id="conteudo">
+
+  <!-- RESUMO EXECUTIVO -->
+  <section class="secao">
+    <div class="secao-titulo">Resumo Executivo</div>
+    <div class="secao-sub">Visão consolidada de todas as fases da execução, em tempo real.</div>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <!-- ALVARÁS POR MÊS -->
+  <section class="secao">
+    <div class="secao-titulo">Alvarás — Previsão de Recebimento por Mês</div>
+    <div class="secao-sub">Soma do valor dos alvarás por mês previsto de recebimento, separada por situação.</div>
+    <div class="card">
+      <div class="grafico-box alto"><canvas id="grafAlvarasMes"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="tabela-wrap">
+        <table id="tabelaAlvaras">
+          <thead>
+            <tr>
+              <th>Processo / Cliente</th>
+              <th>Réu</th>
+              <th>Objeto</th>
+              <th>Valor</th>
+              <th>Mês Previsto</th>
+              <th>Situação</th>
+            </tr>
+          </thead>
+          <tbody id="corpoAlvaras"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ACORDOS POR MÊS -->
+  <section class="secao">
+    <div class="secao-titulo">Acordos — Previsão de Pagamento por Mês</div>
+    <div class="secao-sub">Soma do valor dos acordos por mês do prazo fatal de pagamento.</div>
+    <div class="card">
+      <div class="grafico-box medio"><canvas id="grafAcordosMes"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="tabela-wrap">
+        <table id="tabelaAcordos">
+          <thead>
+            <tr>
+              <th>Processo / Cliente</th>
+              <th>Réu</th>
+              <th>Objeto</th>
+              <th>Valor</th>
+              <th>Prazo Fatal Pgto.</th>
+            </tr>
+          </thead>
+          <tbody id="corpoAcordos"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- VALORES POR ABA -->
+  <section class="secao">
+    <div class="secao-titulo">Valores por Aba</div>
+    <div class="secao-sub" id="subValoresAba">—</div>
+    <div class="resumo-grid" id="resumoAbaGrid"></div>
+    <div class="card">
+      <div class="grafico-box medio"><canvas id="grafValoresAba"></canvas></div>
+    </div>
+  </section>
+
+  <!-- FUNIL DE EXECUÇÃO -->
+  <section class="secao">
+    <div class="secao-titulo">Funil de Execução</div>
+    <div class="secao-sub">Quantidade de processos em acompanhamento em cada fase, da procedência ao acordo/alvará.</div>
+    <div class="card">
+      <div class="grafico-box alto"><canvas id="grafFunil"></canvas></div>
+    </div>
+  </section>
+
+  <!-- COMPOSIÇÃO -->
+  <section class="secao">
+    <div class="secao-titulo">Composição da Carteira</div>
+    <div class="secao-sub">Tipos de ação e maiores contrapartes (réus) em valor, considerando todas as abas financeiras.</div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="secao-sub" style="margin:0 0 .6rem 0">Processos por tipo de objeto</div>
+        <div class="grafico-box medio"><canvas id="grafObjeto"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="secao-sub" style="margin:0 0 .6rem 0">Maiores réus por valor em execução</div>
+        <div class="grafico-box medio"><canvas id="grafReus"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PONTOS DE ATENÇÃO -->
+  <section class="secao">
+    <div class="secao-titulo">Pontos de Atenção</div>
+    <div class="secao-sub">Gerados automaticamente a partir dos dados atuais da planilha.</div>
+    <div class="obs-lista" id="listaAtencao"></div>
+  </section>
+
+</main>
+
+<footer class="rodape">
+  Dados lidos ao vivo da <b>Planilha de Execuções</b> · Atualização automática a cada 5 min<br />
+  <a href="#" id="linkPlanilha" target="_blank" rel="noopener">Abrir planilha no Google Sheets</a>
+</footer>
+
+<script>
+/* =========================================================================
+   CONFIGURAÇÃO
+   ========================================================================= */
+const CONFIG = {
+  // O ID da planilha NÃO fica aqui em texto puro. Ele está dentro do COFRE
+  // abaixo, cifrado com AES-256-GCM a partir do login + senha. Sem a senha
+  // correta não há como decifrar — e sem decifrar a página não sabe qual
+  // planilha ler. Não existe "pular a verificação".
+  SHEET_ID: null,
+  AUTO_REFRESH_MIN: 5
+};
+
+/* -------------------------------------------------------------------------
+   COFRE — {SHEET_ID} cifrado com AES-256-GCM.
+   Chave derivada de PBKDF2-SHA256(usuário + senha, salt, 310.000 iterações).
+   O GCM é autenticado: senha errada faz a decifragem falhar, não há como
+   "aceitar" uma senha inválida. Para trocar a senha, use gerar-senha.html.
+   ------------------------------------------------------------------------- */
+const COFRE = {
+  v: 1,
+  it: 310000,
+  salt: '2r+4HNa6vklMCEFaptWgtA==',
+  iv: 'vDjMdeQSTGQnPQrx',
+  ct: 'eMWPYG982GtVsX2c2Qduvnem+U8VT4GAqz2MgC8QWP2WCMj+DF8tV43VWh4TTDpgAJsB/pWuj7K/cN4+OUhU5aY87NgF9D1bVNvs'
+};
+const CHAVE_SESSAO = 'bm_execucoes_sessao';
+
+/* =========================================================================
+   ABAS DA PLANILHA
+   ========================================================================= */
+const ABAS = [
+  { key: 'procedentes',  nome: 'Procedentes',   gid: 898928208,  temValor: false },
+  { key: 'faseRecursal', nome: 'Fase Recursal',  gid: 1232605002, temValor: false },
+  { key: 'aguardPgto',   nome: 'Aguard. Pgto.',  gid: 862804403,  temValor: true, campoValor: 'Valor a Receber' },
+  { key: 'itivRecJ',     nome: 'ITIV/Rec J.',    gid: 1802163872, temValor: true, campoValor: 'Valor a Receber' },
+  { key: 'penhora',      nome: 'Penhora',        gid: 302613296,  temValor: true, campoValor: 'Valor a Bloquear' },
+  { key: 'impugExec',    nome: 'Impug. à Exec.', gid: 1631806568, temValor: true, campoValor: 'Valor a Receber' },
+  { key: 'alvaras',      nome: 'Alvarás',        gid: 1101170226, temValor: true, campoValor: 'Valor a Receber' },
+  { key: 'acordos',      nome: 'Acordos',        gid: 1024713451, temValor: true, campoValor: 'Valor a Receber' }
+];
+const ABAS_FINANCEIRAS = ABAS.filter(a => a.temValor);
+const ABA_POR_KEY = Object.fromEntries(ABAS.map(a => [a.key, a]));
+
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MESES_CURTO = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const MESES_NORM = MESES.map(m => m.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase());
+
+const COR_AZUL = '#3b82f6', COR_VERDE = '#22c55e', COR_VERMELHO = '#ef4444',
+      COR_AMARELO = '#f59e0b', COR_ROXO = '#a855f7', COR_CIANO = '#06b6d4',
+      COR_MUTED = '#64748b', COR_BORDA = 'rgba(255,255,255,0.06)';
+const PALETA = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6','#8b5cf6','#eab308'];
+
+/* =========================================================================
+   ESTADO
+   ========================================================================= */
+let DADOS = null;
+let graficos = {};
+
+/* =========================================================================
+   UTILITÁRIOS
+   ========================================================================= */
+const fmtBRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const fmtBRL0 = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+
+function moeda(v) { return fmtBRL.format(v || 0); }
+function moedaCurta(v) { return fmtBRL0.format(v || 0); }
+
+/** Converte texto em formato brasileiro ("R$ 1.234,56", "-", "CONTADORIA") em número. */
+function parseNumBR(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  if (v === null || v === undefined) return 0;
+  let t = String(v).replace(/ /g, ' ').trim();
+  if (t === '' || t === '-') return 0;
+  t = t.replace(/R\$/gi, '').replace(/\s/g, '');
+  if (t === '' || t === '-') return 0;
+  const negativo = t.startsWith('-') || /^\(.*\)$/.test(t);
+  t = t.replace(/[()\-+]/g, '');
+  t = t.replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(t);
+  if (!isFinite(n)) return 0;
+  return negativo ? -n : n;
+}
+
+/** "17/08/2026" -> Date. Retorna null se não for uma data válida (vazio, "-", "VENCIDO" etc). */
+function parseDataBR(v) {
+  if (!v) return null;
+  const m = String(v).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const dt = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+/** Interpreta "Mês Previsto" como data (dd/mm/aaaa, mm/aaaa) ou nome de mês por extenso. */
+function parseMesPrevisto(v) {
+  if (!v) return null;
+  const texto = String(v).trim();
+  if (!texto) return null;
+  const data = parseDataBR(texto);
+  if (data) return { ano: data.getFullYear(), mes: data.getMonth() };
+  const mmYYYY = texto.match(/^(\d{1,2})\/(\d{4})$/);
+  if (mmYYYY) return { ano: Number(mmYYYY[2]), mes: Number(mmYYYY[1]) - 1 };
+  const norm = texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  for (let i = 0; i < MESES_NORM.length; i++) {
+    if (norm.startsWith(MESES_NORM[i])) {
+      const anoMatch = texto.match(/(\d{4})/);
+      return { ano: anoMatch ? Number(anoMatch[1]) : new Date().getFullYear(), mes: i };
+    }
+  }
+  return null;
+}
+
+function chaveMes(info) { return `${info.ano}-${String(info.mes + 1).padStart(2, '0')}`; }
+function labelMes(info) { return `${MESES_CURTO[info.mes]}/${String(info.ano).slice(2)}`; }
+
+/* =========================================================================
+   LEITURA DA PLANILHA (CSV público, sem chave de API)
+   ========================================================================= */
+function parseCSV(texto) {
+  const linhas = [];
+  let campo = '', linha = [], dentroAspas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i], prox = texto[i + 1];
+    if (dentroAspas) {
+      if (c === '"' && prox === '"') { campo += '"'; i++; }
+      else if (c === '"') { dentroAspas = false; }
+      else { campo += c; }
+    } else if (c === '"') {
+      dentroAspas = true;
+    } else if (c === ',') {
+      linha.push(campo); campo = '';
+    } else if (c === '\r') {
+      // ignora
+    } else if (c === '\n') {
+      linha.push(campo); linhas.push(linha); campo = ''; linha = [];
+    } else {
+      campo += c;
+    }
+  }
+  if (campo !== '' || linha.length) { linha.push(campo); linhas.push(linha); }
+  return linhas.filter(l => l.some(c => c !== ''));
+}
+
+function linhasParaObjetos(linhas) {
+  if (!linhas.length) return [];
+  const cabecalho = linhas[0].map(h => h.trim());
+  return linhas.slice(1).map(linha => {
+    const obj = {};
+    cabecalho.forEach((h, i) => { obj[h] = (linha[i] !== undefined ? linha[i] : '').trim(); });
+    return obj;
+  });
+}
+
+async function buscarAba(aba) {
+  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&gid=${aba.gid}&_=${Date.now()}`;
+  const resp = await fetch(url, { cache: 'no-store' });
+  if (!resp.ok) throw new Error(`Aba "${aba.nome}": HTTP ${resp.status}`);
+  const texto = await resp.text();
+  return linhasParaObjetos(parseCSV(texto));
+}
+
+async function buscarTudo() {
+  const resultados = await Promise.all(ABAS.map(aba => buscarAba(aba)));
+  const dados = {};
+  ABAS.forEach((aba, i) => { dados[aba.key] = resultados[i]; });
+  return dados;
+}
+
+/* =========================================================================
+   AGREGAÇÕES
+   ========================================================================= */
+function calcularKPIs(dados) {
+  const porAba = {};
+  ABAS.forEach(aba => {
+    const linhas = dados[aba.key];
+    const valor = aba.temValor ? linhas.reduce((s, r) => s + parseNumBR(r[aba.campoValor]), 0) : 0;
+    porAba[aba.key] = { qtd: linhas.length, valor };
+  });
+
+  const valorTotalExecucao = ABAS_FINANCEIRAS.reduce((s, a) => s + porAba[a.key].valor, 0);
+  const totalProcessos = ABAS.reduce((s, a) => s + porAba[a.key].qtd, 0);
+
+  let diligenciar = 0;
+  ABAS.forEach(aba => {
+    dados[aba.key].forEach(r => {
+      if ((r['Diligenciar'] || '').trim().toLowerCase() === 'sim') diligenciar++;
+    });
+  });
+
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  let vencidos = 0, aVencer7 = 0;
+  function checarData(v) {
+    const d = parseDataBR(v);
+    if (!d) return;
+    const dias = Math.round((d - hoje) / 86400000);
+    if (dias < 0) vencidos++;
+    else if (dias <= 7) aVencer7++;
+  }
+  dados.procedentes.forEach(r => checarData(r['Fatal Para TEJ']));
+  dados.aguardPgto.forEach(r => checarData(r['Fatal Pgto.']));
+  dados.penhora.forEach(r => checarData(r['Prazo Fatal Impugnação']));
+  dados.acordos.forEach(r => checarData(r['Fatal Pgto.']));
+  dados.itivRecJ.forEach(r => {
+    if ((r['Prazo Fatal Pgto'] || '').trim().toUpperCase() === 'VENCIDO') vencidos++;
+  });
+
+  const alvarasSolicitados = dados.alvaras.filter(r => (r['Situação Alvará'] || '').trim().toLowerCase() === 'solicitado').length;
+  const alvarasRecebidos = dados.alvaras.filter(r => (r['Situação Alvará'] || '').trim().toLowerCase() === 'recebido').length;
+  const taxaConversaoAlvaras = (alvarasSolicitados + alvarasRecebidos) > 0
+    ? alvarasRecebidos / (alvarasSolicitados + alvarasRecebidos) * 100 : null;
+
+  const alvarasSemPrevisao = dados.alvaras.filter(r => !parseMesPrevisto(r['Mês Previsto Recebimento']));
+  const valorSemPrevisao = alvarasSemPrevisao.reduce((s, r) => s + parseNumBR(r['Valor a Receber']), 0);
+
+  return {
+    porAba, valorTotalExecucao, totalProcessos, diligenciar, vencidos, aVencer7,
+    alvarasSolicitados, alvarasRecebidos, taxaConversaoAlvaras,
+    alvarasSemPrevisao: alvarasSemPrevisao.length, valorSemPrevisao
+  };
+}
+
+function agruparPorMes(linhas, parseMes, campoValor, campoSerie) {
+  const mapa = {};
+  const semPrevisao = { valor: 0, qtd: 0, series: {} };
+  linhas.forEach(r => {
+    const info = parseMes(r);
+    const valor = parseNumBR(r[campoValor]);
+    const serieNome = campoSerie ? ((r[campoSerie] || '').trim() || 'Não informado') : 'Total';
+    if (!info) {
+      semPrevisao.valor += valor; semPrevisao.qtd++;
+      semPrevisao.series[serieNome] = (semPrevisao.series[serieNome] || 0) + valor;
+      return;
+    }
+    const chave = chaveMes(info);
+    if (!mapa[chave]) mapa[chave] = { chave, label: labelMes(info), ordem: info.ano * 12 + info.mes, series: {}, valor: 0, qtd: 0 };
+    mapa[chave].valor += valor; mapa[chave].qtd++;
+    mapa[chave].series[serieNome] = (mapa[chave].series[serieNome] || 0) + valor;
+  });
+  const ordenado = Object.values(mapa).sort((a, b) => a.ordem - b.ordem);
+  if (semPrevisao.qtd) {
+    ordenado.push({ chave: 'sem-previsao', label: 'Sem previsão', ordem: Infinity, series: semPrevisao.series, valor: semPrevisao.valor, qtd: semPrevisao.qtd });
+  }
+  return ordenado;
+}
+
+function corSituacaoAlvara(nome) {
+  const n = nome.toLowerCase();
+  if (n === 'recebido') return COR_VERDE;
+  if (n === 'solicitado') return COR_AMARELO;
+  if (n.includes('indefer') || n.includes('cancel')) return COR_VERMELHO;
+  return COR_MUTED;
+}
+
+/* =========================================================================
+   GRÁFICOS — CONFIGURAÇÃO GLOBAL
+   ========================================================================= */
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.font.family = "'Segoe UI', system-ui, -apple-system, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.borderColor = COR_BORDA;
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.boxWidth = 8;
+Chart.defaults.plugins.legend.labels.padding = 14;
+
+function destruir(id) { if (graficos[id]) { graficos[id].destroy(); delete graficos[id]; } }
+
+function renderGraficoAlvarasMes(dados) {
+  const grupos = agruparPorMes(dados.alvaras, r => parseMesPrevisto(r['Mês Previsto Recebimento']), 'Valor a Receber', 'Situação Alvará');
+  const situacoes = [...new Set(grupos.flatMap(g => Object.keys(g.series)))];
+  const datasets = situacoes.map(sit => ({
+    label: sit,
+    data: grupos.map(g => g.series[sit] || 0),
+    backgroundColor: corSituacaoAlvara(sit),
+    borderRadius: 4, maxBarThickness: 46
+  }));
+  destruir('alvarasMes');
+  graficos.alvarasMes = new Chart(document.getElementById('grafAlvarasMes'), {
+    type: 'bar',
+    data: { labels: grupos.map(g => g.label), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, ticks: { callback: v => moedaCurta(v) }, grid: { color: COR_BORDA } }
+      },
+      plugins: {
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${moeda(ctx.parsed.y)}` } }
+      }
+    }
+  });
+
+  const corpo = document.getElementById('corpoAlvaras');
+  corpo.innerHTML = '';
+  const linhasOrdenadas = [...dados.alvaras].sort((a, b) => parseNumBR(b['Valor a Receber']) - parseNumBR(a['Valor a Receber']));
+  linhasOrdenadas.forEach(r => {
+    const info = parseMesPrevisto(r['Mês Previsto Recebimento']);
+    const situ = (r['Situação Alvará'] || '—').trim() || '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${r['Cliente'] || '—'}</b><br><span style="color:var(--texto-muted);font-size:.75rem">${r['Processo'] || ''}</span></td>
+      <td>${r['Réu'] || '—'}</td>
+      <td>${r['Objeto do Processo'] || '—'}</td>
+      <td><b>${moeda(parseNumBR(r['Valor a Receber']))}</b></td>
+      <td>${info ? labelMes(info) : 'Sem previsão'}</td>
+      <td><span class="tag-pct ${situ.toLowerCase() === 'recebido' ? 'verde' : situ.toLowerCase() === 'solicitado' ? 'amarelo' : 'neutro'}">${situ}</span></td>`;
+    corpo.appendChild(tr);
+  });
+}
+
+function renderGraficoAcordosMes(dados) {
+  const grupos = agruparPorMes(dados.acordos, r => { const d = parseDataBR(r['Fatal Pgto.']); return d ? { ano: d.getFullYear(), mes: d.getMonth() } : null; }, 'Valor a Receber', null);
+  destruir('acordosMes');
+  graficos.acordosMes = new Chart(document.getElementById('grafAcordosMes'), {
+    type: 'bar',
+    data: {
+      labels: grupos.map(g => g.label),
+      datasets: [{ label: 'Valor previsto', data: grupos.map(g => g.valor), backgroundColor: COR_AZUL, borderRadius: 4, maxBarThickness: 46 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { display: false } },
+        y: { ticks: { callback: v => moedaCurta(v) }, grid: { color: COR_BORDA } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => moeda(ctx.parsed.y) } }
+      }
+    }
+  });
+
+  const corpo = document.getElementById('corpoAcordos');
+  corpo.innerHTML = '';
+  const linhasOrdenadas = [...dados.acordos].sort((a, b) => parseNumBR(b['Valor a Receber']) - parseNumBR(a['Valor a Receber']));
+  linhasOrdenadas.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${r['Cliente'] || '—'}</b><br><span style="color:var(--texto-muted);font-size:.75rem">${r['Processo'] || ''}</span></td>
+      <td>${r['Réu'] || '—'}</td>
+      <td>${r['Objeto do Processo'] || '—'}</td>
+      <td><b>${moeda(parseNumBR(r['Valor a Receber']))}</b></td>
+      <td>${r['Fatal Pgto.'] || '—'}</td>`;
+    corpo.appendChild(tr);
+  });
+}
+
+function renderValoresPorAba(dados, kpi) {
+  document.getElementById('subValoresAba').textContent =
+    `Soma de ${moeda(kpi.valorTotalExecucao)} distribuída entre as ${ABAS_FINANCEIRAS.length} abas com valores financeiros.`;
+
+  const grid = document.getElementById('resumoAbaGrid');
+  grid.innerHTML = '';
+  ABAS_FINANCEIRAS.forEach(aba => {
+    const info = kpi.porAba[aba.key];
+    const div = document.createElement('div');
+    div.className = 'resumo-item';
+    div.innerHTML = `
+      <div class="resumo-nome">${aba.nome}</div>
+      <div class="resumo-valor">${moeda(info.valor)}</div>
+      <div class="resumo-nota">${info.qtd} processo${info.qtd === 1 ? '' : 's'} · média de ${moeda(info.qtd ? info.valor / info.qtd : 0)}</div>`;
+    grid.appendChild(div);
+  });
+
+  destruir('valoresAba');
+  graficos.valoresAba = new Chart(document.getElementById('grafValoresAba'), {
+    type: 'bar',
+    data: {
+      labels: ABAS_FINANCEIRAS.map(a => a.nome),
+      datasets: [{
+        label: 'Valor total',
+        data: ABAS_FINANCEIRAS.map(a => kpi.porAba[a.key].valor),
+        backgroundColor: ABAS_FINANCEIRAS.map((_, i) => PALETA[i % PALETA.length]),
+        borderRadius: 4, maxBarThickness: 54
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { callback: v => moedaCurta(v) }, grid: { color: COR_BORDA } },
+        y: { grid: { display: false } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => moeda(ctx.parsed.x) } }
+      }
+    }
+  });
+}
+
+function renderFunil(dados, kpi) {
+  destruir('funil');
+  graficos.funil = new Chart(document.getElementById('grafFunil'), {
+    type: 'bar',
+    data: {
+      labels: ABAS.map(a => a.nome),
+      datasets: [{
+        label: 'Processos em acompanhamento',
+        data: ABAS.map(a => kpi.porAba[a.key].qtd),
+        backgroundColor: COR_CIANO, borderRadius: 4, maxBarThickness: 40
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { precision: 0 }, grid: { color: COR_BORDA } },
+        y: { grid: { display: false } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.parsed.x} processo${ctx.parsed.x === 1 ? '' : 's'}` } }
+      }
+    }
+  });
+}
+
+function agruparTopN(mapaContagem, n) {
+  const entradas = Object.entries(mapaContagem).sort((a, b) => b[1] - a[1]);
+  const topo = entradas.slice(0, n);
+  const resto = entradas.slice(n).reduce((s, [, v]) => s + v, 0);
+  if (resto > 0) topo.push(['Outros', resto]);
+  return topo;
+}
+
+function renderObjeto(dados) {
+  const contagem = {};
+  ABAS.forEach(aba => {
+    if (aba.key === 'itivRecJ') return;
+    dados[aba.key].forEach(r => {
+      const o = (r['Objeto do Processo'] || '').trim();
+      if (!o) return;
+      contagem[o] = (contagem[o] || 0) + 1;
+    });
+  });
+  const top = agruparTopN(contagem, 7);
+  destruir('objeto');
+  graficos.objeto = new Chart(document.getElementById('grafObjeto'), {
+    type: 'doughnut',
+    data: {
+      labels: top.map(([nome]) => nome),
+      datasets: [{ data: top.map(([, v]) => v), backgroundColor: top.map((_, i) => PALETA[i % PALETA.length]), borderColor: '#161b26', borderWidth: 2 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '62%',
+      plugins: {
+        legend: { position: 'right' },
+        tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed} processo${ctx.parsed === 1 ? '' : 's'}` } }
+      }
+    }
+  });
+}
+
+function renderReus(dados) {
+  const valorPorReu = {};
+  ABAS_FINANCEIRAS.forEach(aba => {
+    dados[aba.key].forEach(r => {
+      const reu = (r['Réu'] || '').trim();
+      if (!reu) return;
+      valorPorReu[reu] = (valorPorReu[reu] || 0) + parseNumBR(r[aba.campoValor]);
+    });
+  });
+  const top = Object.entries(valorPorReu).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  destruir('reus');
+  graficos.reus = new Chart(document.getElementById('grafReus'), {
+    type: 'bar',
+    data: {
+      labels: top.map(([nome]) => nome.length > 26 ? nome.slice(0, 24) + '…' : nome),
+      datasets: [{ label: 'Valor em execução', data: top.map(([, v]) => v), backgroundColor: COR_ROXO, borderRadius: 4, maxBarThickness: 30 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { callback: v => moedaCurta(v) }, grid: { color: COR_BORDA } },
+        y: { grid: { display: false } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => moeda(ctx.parsed.x) } }
+      }
+    }
+  });
+}
+
+/* =========================================================================
+   KPIS (CARTÕES)
+   ========================================================================= */
+function cartaoKPI(nome, valor, cor, rodape, pct) {
+  return `
+    <div class="card kpi ${cor}">
+      <div class="kpi-topo">
+        <span class="kpi-nome">${nome}</span>
+        ${pct !== undefined ? `<span class="kpi-pct ${cor === 'vermelho' ? 'vermelho' : cor === 'amarelo' ? 'amarelo' : 'verde'}">${pct}</span>` : ''}
+      </div>
+      <div class="kpi-valor">${valor}</div>
+      ${rodape ? `<div class="kpi-rodape"><span>${rodape}</span></div>` : ''}
+    </div>`;
+}
+
+function renderKPIs(dados, kpi) {
+  const el = document.getElementById('kpis');
+  const p = kpi.porAba;
+  const conversao = kpi.taxaConversaoAlvaras !== null ? kpi.taxaConversaoAlvaras.toFixed(0) + '%' : '—';
+
+  el.innerHTML = [
+    cartaoKPI('Valor Total em Execução', moeda(kpi.valorTotalExecucao), 'azul',
+      `<span>${kpi.totalProcessos} processos em acompanhamento nas ${ABAS.length} abas</span>`),
+    cartaoKPI('Alvarás', moeda(p.alvaras.valor), 'roxo', `<span><b>${p.alvaras.qtd}</b> processos</span>`),
+    cartaoKPI('Acordos', moeda(p.acordos.valor), 'roxo', `<span><b>${p.acordos.qtd}</b> processos</span>`),
+    cartaoKPI('Aguardando Pagamento', moeda(p.aguardPgto.valor), 'azul', `<span><b>${p.aguardPgto.qtd}</b> processos</span>`),
+    cartaoKPI('ITIV / Rec. Judicial', moeda(p.itivRecJ.valor), 'azul', `<span><b>${p.itivRecJ.qtd}</b> processos</span>`),
+    cartaoKPI('Penhora (a bloquear)', moeda(p.penhora.valor), 'azul', `<span><b>${p.penhora.qtd}</b> processos</span>`),
+    cartaoKPI('Impugnação à Execução', moeda(p.impugExec.valor), 'azul', `<span><b>${p.impugExec.qtd}</b> processos</span>`),
+    cartaoKPI('Conversão de Alvarás', conversao, kpi.taxaConversaoAlvaras >= 50 ? 'verde' : 'amarelo',
+      `<span><b>${kpi.alvarasRecebidos}</b> recebido${kpi.alvarasRecebidos === 1 ? '' : 's'} de <b>${kpi.alvarasSolicitados + kpi.alvarasRecebidos}</b> alvarás no total</span>`),
+    cartaoKPI('A Diligenciar', kpi.diligenciar, 'amarelo', `<span>processos marcados para ação imediata</span>`),
+    cartaoKPI('Prazos Vencidos', kpi.vencidos, kpi.vencidos > 0 ? 'vermelho' : 'verde', `<span>prazos fatais já ultrapassados</span>`),
+    cartaoKPI('Vencendo em 7 Dias', kpi.aVencer7, kpi.aVencer7 > 0 ? 'amarelo' : 'verde', `<span>prazos fatais próximos do limite</span>`),
+    cartaoKPI('Alvarás sem Previsão', kpi.alvarasSemPrevisao, kpi.alvarasSemPrevisao > 0 ? 'amarelo' : 'verde',
+      `<span>${moeda(kpi.valorSemPrevisao)} sem mês de recebimento informado</span>`)
+  ].join('');
+}
+
+/* =========================================================================
+   PONTOS DE ATENÇÃO
+   ========================================================================= */
+function obsCard(tipo, icone, titulo, texto) {
+  return `<div class="obs ${tipo}"><div class="obs-icone">${icone}</div><div class="obs-corpo"><div class="obs-titulo">${titulo}</div><div class="obs-texto">${texto}</div></div></div>`;
+}
+
+function renderAtencao(dados, kpi) {
+  const itens = [];
+
+  if (kpi.vencidos > 0) {
+    itens.push(obsCard('critico', '⚠️', 'Prazos fatais vencidos',
+      `Há <b>${kpi.vencidos} processo${kpi.vencidos === 1 ? '' : 's'}</b> com prazo fatal já ultrapassado. Priorize a diligência nessas execuções.`));
+  }
+  if (kpi.aVencer7 > 0) {
+    itens.push(obsCard('atencao', '⏳', 'Prazos vencendo nos próximos 7 dias',
+      `<b>${kpi.aVencer7} processo${kpi.aVencer7 === 1 ? '' : 's'}</b> com prazo fatal dentro de uma semana.`));
+  }
+  if (kpi.diligenciar > 0) {
+    itens.push(obsCard('atencao', '📌', 'Processos aguardando diligência',
+      `<b>${kpi.diligenciar}</b> processos estão marcados com "Diligenciar: Sim" em uma ou mais abas.`));
+  }
+  if (kpi.alvarasSemPrevisao > 0) {
+    itens.push(obsCard('atencao', '🗓️', 'Alvarás sem mês de previsão',
+      `<b>${kpi.alvarasSemPrevisao}</b> alvará${kpi.alvarasSemPrevisao === 1 ? '' : 's'} (${moeda(kpi.valorSemPrevisao)}) está${kpi.alvarasSemPrevisao === 1 ? '' : 'ão'} sem a coluna <b>"Mês Previsto Recebimento"</b> preenchida. Preencha-a na planilha para habilitar a projeção mensal completa.`));
+  }
+
+  const valorPorReu = {};
+  ABAS_FINANCEIRAS.forEach(aba => dados[aba.key].forEach(r => {
+    const reu = (r['Réu'] || '').trim();
+    if (!reu) return;
+    valorPorReu[reu] = (valorPorReu[reu] || 0) + parseNumBR(r[aba.campoValor]);
+  }));
+  const topReu = Object.entries(valorPorReu).sort((a, b) => b[1] - a[1])[0];
+  if (topReu && kpi.valorTotalExecucao > 0) {
+    const pctConcentracao = (topReu[1] / kpi.valorTotalExecucao * 100).toFixed(0);
+    itens.push(obsCard('info', '🏛️', 'Maior concentração por réu',
+      `<b>${topReu[0]}</b> responde por <b>${moeda(topReu[1])}</b> (${pctConcentracao}% do valor total em execução).`));
+  }
+
+  const recJud = dados.itivRecJ.filter(r => (r['Prazo Fatal Pgto'] || '').trim().toUpperCase() === 'REC. JUD.').length;
+  if (recJud > 0) {
+    itens.push(obsCard('info', 'ℹ️', 'Processos em recuperação judicial',
+      `<b>${recJud}</b> processo${recJud === 1 ? '' : 's'} da aba ITIV/Rec J. está${recJud === 1 ? '' : 'ão'} sob recuperação judicial da parte contrária, o que tende a alongar o prazo de recebimento.`));
+  }
+
+  if (kpi.taxaConversaoAlvaras !== null && kpi.taxaConversaoAlvaras >= 50) {
+    itens.push(obsCard('bom', '✅', 'Boa conversão de alvarás',
+      `${kpi.taxaConversaoAlvaras.toFixed(0)}% dos alvarás solicitados já foram recebidos.`));
+  }
+
+  const el = document.getElementById('listaAtencao');
+  el.innerHTML = itens.length ? itens.join('') : `<div class="obs-vazio">Nenhum ponto de atenção identificado no momento.</div>`;
+}
+
+/* =========================================================================
+   CICLO PRINCIPAL
+   ========================================================================= */
+function render(dados) {
+  const kpi = calcularKPIs(dados);
+  renderKPIs(dados, kpi);
+  renderGraficoAlvarasMes(dados);
+  renderGraficoAcordosMes(dados);
+  renderValoresPorAba(dados, kpi);
+  renderFunil(dados, kpi);
+  renderObjeto(dados);
+  renderReus(dados);
+  renderAtencao(dados, kpi);
+}
+
+async function carregarDados() {
+  const erroEl = document.getElementById('erroBox');
+  try {
+    const dados = await buscarTudo();
+    DADOS = dados;
+
+    document.getElementById('linkPlanilha').href = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/edit`;
+    document.getElementById('carregando').classList.add('oculto');
+    document.getElementById('conteudo').classList.remove('oculto');
+    erroEl.classList.add('oculto');
+    document.getElementById('atualizadoEm').textContent =
+      'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    render(dados);
+  } catch (e) {
+    console.error(e);
+    document.getElementById('carregando').classList.add('oculto');
+    erroEl.classList.remove('oculto');
+    erroEl.innerHTML = `<b>Não foi possível carregar a planilha.</b><br>${e.message}<br>
+      Verifique se a planilha está compartilhada como <b>"qualquer pessoa com o link pode ver"</b>.
+      Nova tentativa automática em ${CONFIG.AUTO_REFRESH_MIN} min.`;
+  }
+}
+
+document.getElementById('btnAtualizar').addEventListener('click', carregarDados);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && DADOS) carregarDados(); });
+setInterval(() => { if (DADOS) carregarDados(); }, CONFIG.AUTO_REFRESH_MIN * 60 * 1000);
+
+/* =========================================================================
+   AUTENTICAÇÃO
+   Não é uma "verificação" que possa ser pulada: o ID da planilha só existe
+   cifrado dentro do COFRE. A senha correta é o que produz a chave capaz de
+   decifrá-lo. Senha errada = decifragem falha = sem dados.
+   ========================================================================= */
+const b64bytes = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+
+async function abrirCofre(usuario, senha) {
+  const enc = new TextEncoder();
+  const material = await crypto.subtle.importKey(
+    'raw', enc.encode(usuario.trim().toLowerCase() + '\n' + senha),
+    'PBKDF2', false, ['deriveKey']
+  );
+  const chave = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: b64bytes(COFRE.salt), iterations: COFRE.it, hash: 'SHA-256' },
+    material, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
+  );
+  const claro = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: b64bytes(COFRE.iv) }, chave, b64bytes(COFRE.ct)
+  );
+  return JSON.parse(new TextDecoder().decode(claro));
+}
+
+function entrarNoPainel(segredo, guardarSessao) {
+  CONFIG.SHEET_ID = segredo.SHEET_ID;
+  if (guardarSessao) {
+    try { sessionStorage.setItem(CHAVE_SESSAO, JSON.stringify(segredo)); } catch (e) {}
+  }
+  document.getElementById('loginOverlay').classList.add('oculto');
+  document.getElementById('cabecalho').classList.remove('oculto');
+  document.getElementById('carregando').classList.remove('oculto');
+  carregarDados();
+}
+
+document.getElementById('loginForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const btn = document.getElementById('btnEntrar');
+  const erroEl = document.getElementById('loginErro');
+  const usuario = document.getElementById('campoUsuario').value;
+  const senha = document.getElementById('campoSenha').value;
+
+  erroEl.classList.add('oculto');
+  btn.disabled = true;
+  btn.textContent = 'Verificando…';
+  await new Promise(r => setTimeout(r, 30));
+
+  try {
+    const segredo = await abrirCofre(usuario, senha);
+    btn.textContent = 'Entrando…';
+    entrarNoPainel(segredo, true);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+    erroEl.classList.remove('oculto');
+    erroEl.textContent = 'Login ou senha incorretos.';
+    document.getElementById('campoSenha').value = '';
+    document.getElementById('campoSenha').focus();
+  }
+});
+
+document.getElementById('btnSair').addEventListener('click', () => {
+  try { sessionStorage.removeItem(CHAVE_SESSAO); } catch (e) {}
+  location.reload();
+});
+
+(function iniciar() {
+  let salvo = null;
+  try { salvo = sessionStorage.getItem(CHAVE_SESSAO); } catch (e) {}
+  if (salvo) {
+    try { entrarNoPainel(JSON.parse(salvo), false); return; } catch (e) {}
+  }
+  document.getElementById('campoUsuario').focus();
+})();
+</script>
+</body>
+</html>

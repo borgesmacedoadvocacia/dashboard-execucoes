@@ -50,13 +50,28 @@ bloco `const COFRE = {…};` do `index.html` pelo texto gerado, depois é só co
 
 | Seção | Conteúdo |
 |---|---|
-| Resumo Executivo | Valor total em execução, valor e quantidade por aba, taxa de conversão de alvarás, processos a diligenciar, prazos vencidos e a vencer em 7 dias |
+| Resumo Executivo | Valor total em execução, valor e quantidade por aba, taxa de conversão de alvarás, processos a diligenciar, prazos vencidos, a vencer em 7 dias e sem prazo alvo |
+| Prazos Alvo — Agenda de Vencimentos | Visão consolidada dos prazos alvo das 4 abas que os têm, com cartões-resumo por aba, gráfico de processos por mês (Alvarás separado por situação) e tabela filtrável por urgência (vencidos, 7 dias, 30 dias, sem prazo) e por aba |
 | Alvarás por Mês | Soma do valor dos alvarás por mês previsto de recebimento, separada por situação (Solicitado / Recebido), com tabela de todos os processos |
 | Acordos por Mês | Soma do valor dos acordos por mês do prazo fatal de pagamento, com tabela de todos os processos |
 | Valores por Aba | Comparativo de valor total entre Aguard. Pgto., ITIV/Rec J., Penhora, Impug. à Exec., Alvarás e Acordos |
 | Funil de Execução | Quantidade de processos em acompanhamento em cada fase, da procedência ao acordo/alvará |
 | Composição da Carteira | Distribuição dos processos por tipo de objeto de ação e maiores réus (contrapartes) por valor em execução |
-| Pontos de Atenção | Alertas gerados automaticamente: prazos vencidos, prazos vencendo em 7 dias, processos a diligenciar, alvarás sem mês de previsão cadastrado, concentração por réu, processos em recuperação judicial |
+| Pontos de Atenção | Alertas gerados automaticamente: prazos vencidos, prazos vencendo em 7 dias, alvarás pendentes com mês previsto já encerrado, processos a diligenciar, processos sem prazo alvo definido, concentração por réu, processos em recuperação judicial |
+
+## Prazos alvo por aba
+
+O "prazo alvo" é a data de referência que o dashboard acompanha em cada aba:
+
+| Aba | Coluna da planilha | Prazo alvo |
+|---|---|---|
+| Procedentes | **E** | Fatal Para TEJ |
+| Aguard. Pgto. | **H** | Fatal Pgto. |
+| Alvarás | **F** | Mês Previsto Recebimento — contado até o último dia do mês e **separado pela Situação Alvará** (alvará "Recebido" conta como concluído, não como pendência) |
+| Acordos | **F** | Fatal Pgto. |
+
+O código localiza essas colunas primeiro pelo nome do cabeçalho e, se o cabeçalho for
+renomeado, pela posição da coluna (E, F, H) como reserva.
 
 ## Sobre as colunas "Mês Previsto"
 

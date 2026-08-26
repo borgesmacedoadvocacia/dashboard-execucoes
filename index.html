@@ -130,6 +130,21 @@
   .val-neg { color: var(--vermelho); font-weight: 600; }
   .val-pos { color: var(--verde); font-weight: 600; }
 
+  /* ===== FILTROS (CHIPS) ===== */
+  .filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-bottom: 0.9rem; }
+  .filtros .sep { width: 1px; align-self: stretch; background: var(--borda); margin: 0 0.35rem; }
+  .chip {
+    background: var(--bg3); border: 1px solid var(--borda); border-radius: 999px;
+    color: var(--texto-muted); font-size: 0.74rem; font-weight: 600; font-family: inherit;
+    padding: 0.3rem 0.75rem; cursor: pointer; transition: all .15s; white-space: nowrap;
+  }
+  .chip:hover { color: var(--texto); border-color: rgba(255,255,255,0.25); }
+  .chip.ativo { background: var(--azul); border-color: var(--azul); color: #fff; }
+  .tag-aba {
+    display: inline-block; padding: 0.12rem 0.5rem; border-radius: 5px;
+    font-size: 0.7rem; font-weight: 700; white-space: nowrap;
+  }
+
   /* ===== GRÁFICOS ===== */
   .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(370px, 1fr)); gap: 1rem; }
   .grafico-box { position: relative; width: 100%; }
@@ -305,6 +320,49 @@
     <div class="kpis" id="kpis"></div>
   </section>
 
+  <!-- PRAZOS ALVO -->
+  <section class="secao">
+    <div class="secao-titulo">Prazos Alvo — Agenda de Vencimentos</div>
+    <div class="secao-sub">Prazo alvo de cada aba: Procedentes = Fatal p/ TEJ · Aguard. Pgto. = Fatal Pgto. · Alvarás = mês previsto de recebimento (contado até o fim do mês, separado por situação) · Acordos = Fatal Pgto.</div>
+    <div class="resumo-grid" id="resumoPrazos"></div>
+    <div class="card">
+      <div class="secao-sub" style="margin:0 0 .6rem 0">Processos com prazo alvo em cada mês</div>
+      <div class="grafico-box medio"><canvas id="grafPrazosAlvo"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="filtros" id="filtrosPrazos">
+        <button type="button" class="chip ativo" data-status="pendentes">Pendentes</button>
+        <button type="button" class="chip" data-status="vencido">Vencidos</button>
+        <button type="button" class="chip" data-status="7">Próx. 7 dias</button>
+        <button type="button" class="chip" data-status="30">Próx. 30 dias</button>
+        <button type="button" class="chip" data-status="sem">Sem prazo</button>
+        <button type="button" class="chip" data-status="todos">Todos</button>
+        <div class="sep"></div>
+        <button type="button" class="chip ativo" data-aba="todas">Todas as abas</button>
+        <button type="button" class="chip" data-aba="procedentes">Procedentes</button>
+        <button type="button" class="chip" data-aba="aguardPgto">Aguard. Pgto.</button>
+        <button type="button" class="chip" data-aba="alvaras">Alvarás</button>
+        <button type="button" class="chip" data-aba="acordos">Acordos</button>
+      </div>
+      <div class="tabela-wrap">
+        <table id="tabelaPrazos">
+          <thead>
+            <tr>
+              <th>Cliente / Processo</th>
+              <th>Aba</th>
+              <th>Réu</th>
+              <th>Valor</th>
+              <th>Prazo Alvo</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="corpoPrazos"></tbody>
+        </table>
+      </div>
+      <div class="secao-sub" id="notaPrazos" style="margin:.6rem 0 0 0"></div>
+    </div>
+  </section>
+
   <!-- ALVARÁS POR MÊS -->
   <section class="secao">
     <div class="secao-titulo">Alvarás — Previsão de Recebimento por Mês</div>
@@ -436,17 +494,28 @@ const CHAVE_SESSAO = 'bm_execucoes_sessao';
 /* =========================================================================
    ABAS DA PLANILHA
    ========================================================================= */
+/* prazoAlvo: qual coluna da aba é o prazo alvo (idx = posição da coluna na
+   planilha: E=4, F=5, H=7; header = nome do cabeçalho, usado primeiro e com
+   fallback pela posição caso o cabeçalho seja renomeado).
+   tipo 'data' = dd/mm/aaaa; tipo 'mes' = mês por extenso, contado até o
+   último dia do mês. */
 const ABAS = [
-  { key: 'procedentes',  nome: 'Procedentes',   gid: 898928208,  temValor: false },
+  { key: 'procedentes',  nome: 'Procedentes',   gid: 898928208,  temValor: false,
+    prazoAlvo: { idx: 4, header: 'Fatal Para TEJ', tipo: 'data', rotulo: 'Fatal p/ TEJ' } },
   { key: 'faseRecursal', nome: 'Fase Recursal',  gid: 1232605002, temValor: false },
-  { key: 'aguardPgto',   nome: 'Aguard. Pgto.',  gid: 862804403,  temValor: true, campoValor: 'Valor a Receber' },
+  { key: 'aguardPgto',   nome: 'Aguard. Pgto.',  gid: 862804403,  temValor: true, campoValor: 'Valor a Receber',
+    prazoAlvo: { idx: 7, header: 'Fatal Pgto.', tipo: 'data', rotulo: 'Fatal Pgto.' } },
   { key: 'itivRecJ',     nome: 'ITIV/Rec J.',    gid: 1802163872, temValor: true, campoValor: 'Valor a Receber' },
   { key: 'penhora',      nome: 'Penhora',        gid: 302613296,  temValor: true, campoValor: 'Valor a Bloquear' },
   { key: 'impugExec',    nome: 'Impug. à Exec.', gid: 1631806568, temValor: true, campoValor: 'Valor a Receber' },
-  { key: 'alvaras',      nome: 'Alvarás',        gid: 1101170226, temValor: true, campoValor: 'Valor a Receber' },
-  { key: 'acordos',      nome: 'Acordos',        gid: 1024713451, temValor: true, campoValor: 'Valor a Receber' }
+  { key: 'alvaras',      nome: 'Alvarás',        gid: 1101170226, temValor: true, campoValor: 'Valor a Receber',
+    prazoAlvo: { idx: 5, header: 'Mês Previsto Recebimento', tipo: 'mes', rotulo: 'Mês previsto' },
+    campoSituacao: { idx: 6, header: 'Situação Alvará' } },
+  { key: 'acordos',      nome: 'Acordos',        gid: 1024713451, temValor: true, campoValor: 'Valor a Receber',
+    prazoAlvo: { idx: 5, header: 'Fatal Pgto.', tipo: 'data', rotulo: 'Fatal Pgto.' } }
 ];
 const ABAS_FINANCEIRAS = ABAS.filter(a => a.temValor);
+const ABAS_PRAZO = ABAS.filter(a => a.prazoAlvo);
 const ABA_POR_KEY = Object.fromEntries(ABAS.map(a => [a.key, a]));
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -457,6 +526,7 @@ const COR_AZUL = '#3b82f6', COR_VERDE = '#22c55e', COR_VERMELHO = '#ef4444',
       COR_AMARELO = '#f59e0b', COR_ROXO = '#a855f7', COR_CIANO = '#06b6d4',
       COR_MUTED = '#64748b', COR_BORDA = 'rgba(255,255,255,0.06)';
 const PALETA = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6','#8b5cf6','#eab308'];
+const COR_ABA_PRAZO = { procedentes: COR_AZUL, aguardPgto: COR_CIANO, alvaras: COR_AMARELO, acordos: COR_ROXO };
 
 /* =========================================================================
    ESTADO
@@ -554,6 +624,8 @@ function linhasParaObjetos(linhas) {
   return linhas.slice(1).map(linha => {
     const obj = {};
     cabecalho.forEach((h, i) => { obj[h] = (linha[i] !== undefined ? linha[i] : '').trim(); });
+    // Guarda a linha bruta para permitir leitura por posição de coluna (A=0, B=1…)
+    Object.defineProperty(obj, '__raw', { value: linha, enumerable: false });
     return obj;
   });
 }
@@ -574,9 +646,77 @@ async function buscarTudo() {
 }
 
 /* =========================================================================
+   PRAZOS ALVO
+   ========================================================================= */
+function hojeZerado() { const h = new Date(); h.setHours(0, 0, 0, 0); return h; }
+
+/** Lê um campo preferindo o nome do cabeçalho, com fallback pela posição da coluna. */
+function lerCampo(r, campo) {
+  if (!campo) return '';
+  if (campo.header && r[campo.header] !== undefined) return String(r[campo.header]).trim();
+  if (r.__raw && r.__raw[campo.idx] !== undefined) return String(r.__raw[campo.idx]).trim();
+  return '';
+}
+
+/**
+ * Classifica o prazo alvo de uma linha.
+ * status: vencido | hoje | d7 | d30 | futuro | sem | concluido
+ * (alvará com situação "Recebido" é concluído — não conta como pendência)
+ */
+function infoPrazoAlvo(aba, r, hoje) {
+  const bruto = lerCampo(r, aba.prazoAlvo);
+  const situacao = aba.campoSituacao ? lerCampo(r, aba.campoSituacao) : '';
+  const concluido = situacao.toLowerCase() === 'recebido';
+  let data = null, label = 'Sem prazo';
+  if (aba.prazoAlvo.tipo === 'mes') {
+    const m = parseMesPrevisto(bruto);
+    if (m) { data = new Date(m.ano, m.mes + 1, 0); label = labelMes(m); }
+  } else {
+    data = parseDataBR(bruto);
+    if (data) label = bruto;
+  }
+  let dias = null, status;
+  if (concluido) status = 'concluido';
+  else if (!data) status = 'sem';
+  else {
+    dias = Math.round((data - hoje) / 86400000);
+    status = dias < 0 ? 'vencido' : dias === 0 ? 'hoje' : dias <= 7 ? 'd7' : dias <= 30 ? 'd30' : 'futuro';
+  }
+  return { bruto, situacao, concluido, data, dias, status, label };
+}
+
+const ORDEM_STATUS = { vencido: 0, hoje: 1, d7: 2, d30: 3, futuro: 4, sem: 5, concluido: 6 };
+
+/** Lista consolidada das 4 abas com prazo alvo, ordenada por urgência e data. */
+function montarListaPrazos(dados, hoje) {
+  const lista = [];
+  ABAS_PRAZO.forEach(aba => {
+    dados[aba.key].forEach(r => lista.push({ aba, r, info: infoPrazoAlvo(aba, r, hoje) }));
+  });
+  lista.sort((a, b) =>
+    (ORDEM_STATUS[a.info.status] - ORDEM_STATUS[b.info.status]) ||
+    ((a.info.data ? a.info.data.getTime() : Infinity) - (b.info.data ? b.info.data.getTime() : Infinity)));
+  return lista;
+}
+
+function badgePrazo(info) {
+  if (info.status === 'concluido') return `<span class="tag-pct verde">Recebido</span>`;
+  if (info.status === 'sem') return `<span class="tag-pct neutro">Sem prazo</span>`;
+  if (info.status === 'vencido') return `<span class="tag-pct vermelho">Vencido há ${-info.dias} dia${info.dias === -1 ? '' : 's'}</span>`;
+  if (info.status === 'hoje') return `<span class="tag-pct vermelho">Vence hoje</span>`;
+  const cor = info.status === 'futuro' ? 'neutro' : 'amarelo';
+  return `<span class="tag-pct ${cor}">Em ${info.dias} dia${info.dias === 1 ? '' : 's'}</span>`;
+}
+
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+/* =========================================================================
    AGREGAÇÕES
    ========================================================================= */
-function calcularKPIs(dados) {
+function calcularKPIs(dados, listaPrazos, hoje) {
   const porAba = {};
   ABAS.forEach(aba => {
     const linhas = dados[aba.key];
@@ -594,19 +734,20 @@ function calcularKPIs(dados) {
     });
   });
 
-  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  // Vencidos / a vencer com base nos prazos alvo das 4 abas (alvará recebido não conta)
   let vencidos = 0, aVencer7 = 0;
-  function checarData(v) {
-    const d = parseDataBR(v);
+  listaPrazos.forEach(({ info }) => {
+    if (info.status === 'vencido') vencidos++;
+    else if (info.status === 'hoje' || info.status === 'd7') aVencer7++;
+  });
+  // Prazos fatais fora do conceito de prazo alvo (Penhora e ITIV/Rec J.)
+  dados.penhora.forEach(r => {
+    const d = parseDataBR(r['Prazo Fatal Impugnação']);
     if (!d) return;
     const dias = Math.round((d - hoje) / 86400000);
     if (dias < 0) vencidos++;
     else if (dias <= 7) aVencer7++;
-  }
-  dados.procedentes.forEach(r => checarData(r['Fatal Para TEJ']));
-  dados.aguardPgto.forEach(r => checarData(r['Fatal Pgto.']));
-  dados.penhora.forEach(r => checarData(r['Prazo Fatal Impugnação']));
-  dados.acordos.forEach(r => checarData(r['Fatal Pgto.']));
+  });
   dados.itivRecJ.forEach(r => {
     if ((r['Prazo Fatal Pgto'] || '').trim().toUpperCase() === 'VENCIDO') vencidos++;
   });
@@ -616,13 +757,27 @@ function calcularKPIs(dados) {
   const taxaConversaoAlvaras = (alvarasSolicitados + alvarasRecebidos) > 0
     ? alvarasRecebidos / (alvarasSolicitados + alvarasRecebidos) * 100 : null;
 
-  const alvarasSemPrevisao = dados.alvaras.filter(r => !parseMesPrevisto(r['Mês Previsto Recebimento']));
-  const valorSemPrevisao = alvarasSemPrevisao.reduce((s, r) => s + parseNumBR(r['Valor a Receber']), 0);
+  // Sem prazo alvo definido, por aba
+  const semPrazoPorAba = {};
+  let semPrazoTotal = 0, semPrazoValor = 0;
+  listaPrazos.forEach(({ aba, r, info }) => {
+    if (info.status !== 'sem') return;
+    const valor = aba.temValor ? parseNumBR(r[aba.campoValor]) : 0;
+    semPrazoTotal++; semPrazoValor += valor;
+    if (!semPrazoPorAba[aba.key]) semPrazoPorAba[aba.key] = { qtd: 0, valor: 0 };
+    semPrazoPorAba[aba.key].qtd++; semPrazoPorAba[aba.key].valor += valor;
+  });
+
+  // Alvarás pendentes com mês previsto já encerrado
+  const atrasados = listaPrazos.filter(x => x.aba.key === 'alvaras' && x.info.status === 'vencido');
+  const alvarasAtrasados = atrasados.length;
+  const alvarasAtrasadosValor = atrasados.reduce((s, x) => s + parseNumBR(x.r['Valor a Receber']), 0);
 
   return {
     porAba, valorTotalExecucao, totalProcessos, diligenciar, vencidos, aVencer7,
     alvarasSolicitados, alvarasRecebidos, taxaConversaoAlvaras,
-    alvarasSemPrevisao: alvarasSemPrevisao.length, valorSemPrevisao
+    semPrazoPorAba, semPrazoTotal, semPrazoValor,
+    alvarasAtrasados, alvarasAtrasadosValor
   };
 }
 
@@ -671,6 +826,129 @@ Chart.defaults.plugins.legend.labels.padding = 14;
 
 function destruir(id) { if (graficos[id]) { graficos[id].destroy(); delete graficos[id]; } }
 
+/* =========================================================================
+   SEÇÃO PRAZOS ALVO
+   ========================================================================= */
+let LISTA_PRAZOS = [];
+const FILTRO_PRAZOS = { status: 'pendentes', aba: 'todas' };
+
+function statusPassaFiltro(info, f) {
+  if (f === 'todos') return true;
+  if (f === 'pendentes') return info.status !== 'concluido';
+  if (f === 'vencido') return info.status === 'vencido' || info.status === 'hoje';
+  if (f === '7') return info.status === 'hoje' || info.status === 'd7';
+  if (f === '30') return info.status === 'hoje' || info.status === 'd7' || info.status === 'd30';
+  if (f === 'sem') return info.status === 'sem';
+  return true;
+}
+
+function renderTabelaPrazos() {
+  const corpo = document.getElementById('corpoPrazos');
+  const visiveis = LISTA_PRAZOS.filter(x =>
+    statusPassaFiltro(x.info, FILTRO_PRAZOS.status) &&
+    (FILTRO_PRAZOS.aba === 'todas' || x.aba.key === FILTRO_PRAZOS.aba));
+
+  corpo.innerHTML = '';
+  visiveis.forEach(({ aba, r, info }) => {
+    const cor = COR_ABA_PRAZO[aba.key];
+    const situ = aba.key === 'alvaras' && !info.concluido && info.situacao
+      ? ` <span class="tag-pct neutro">${info.situacao}</span>` : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${r['Cliente'] || '—'}</b><br><span style="color:var(--texto-muted);font-size:.75rem">${r['Processo'] || ''}</span></td>
+      <td><span class="tag-aba" style="background:${hexA(cor, 0.13)};color:${cor}">${aba.nome}</span></td>
+      <td>${r['Réu'] || '—'}</td>
+      <td>${aba.temValor ? `<b>${moeda(parseNumBR(r[aba.campoValor]))}</b>` : '—'}</td>
+      <td>${info.label}</td>
+      <td>${badgePrazo(info)}${situ}</td>`;
+    corpo.appendChild(tr);
+  });
+  if (!visiveis.length) {
+    corpo.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--texto-muted);padding:1.2rem">Nenhum processo neste filtro.</td></tr>`;
+  }
+  document.getElementById('notaPrazos').textContent =
+    `Exibindo ${visiveis.length} de ${LISTA_PRAZOS.length} processos das abas com prazo alvo.`;
+}
+
+function renderPrazosAlvo(lista) {
+  LISTA_PRAZOS = lista;
+
+  // --- Cartões-resumo por aba ---
+  const grid = document.getElementById('resumoPrazos');
+  grid.innerHTML = '';
+  ABAS_PRAZO.forEach(aba => {
+    const itens = lista.filter(x => x.aba.key === aba.key);
+    const vencidos = itens.filter(x => x.info.status === 'vencido').length;
+    const prox7 = itens.filter(x => x.info.status === 'hoje' || x.info.status === 'd7').length;
+    const sem = itens.filter(x => x.info.status === 'sem').length;
+    const recebidos = itens.filter(x => x.info.status === 'concluido').length;
+    const pendentes = itens.length - recebidos;
+    const partes = [];
+    if (vencidos) partes.push(`<span style="color:var(--vermelho);font-weight:700">${vencidos} vencido${vencidos === 1 ? '' : 's'}</span>`);
+    if (prox7) partes.push(`<span style="color:var(--amarelo);font-weight:700">${prox7} em 7 dias</span>`);
+    if (sem) partes.push(`${sem} sem prazo`);
+    if (recebidos) partes.push(`<span style="color:var(--verde);font-weight:700">${recebidos} recebido${recebidos === 1 ? '' : 's'}</span>`);
+    const div = document.createElement('div');
+    div.className = 'resumo-item';
+    div.innerHTML = `
+      <div class="resumo-nome" style="color:${COR_ABA_PRAZO[aba.key]}">${aba.nome} · ${aba.prazoAlvo.rotulo}</div>
+      <div class="resumo-valor">${pendentes} <span style="font-size:.78rem;color:var(--texto-muted);font-weight:600">pendente${pendentes === 1 ? '' : 's'}</span></div>
+      <div class="resumo-nota">${partes.length ? partes.join(' · ') : 'sem alertas'}</div>`;
+    grid.appendChild(div);
+  });
+
+  // --- Gráfico: processos com prazo alvo por mês (Alvarás separado por situação) ---
+  const series = [];
+  const situacoesAlvara = [...new Set(lista.filter(x => x.aba.key === 'alvaras').map(x => x.info.situacao || 'Não informado'))];
+  ABAS_PRAZO.forEach(aba => {
+    if (aba.key === 'alvaras') {
+      situacoesAlvara.forEach(sit => series.push({
+        nome: `Alvarás — ${sit}`, cor: corSituacaoAlvara(sit),
+        pertence: x => x.aba.key === 'alvaras' && (x.info.situacao || 'Não informado') === sit
+      }));
+    } else {
+      series.push({ nome: aba.nome, cor: COR_ABA_PRAZO[aba.key], pertence: x => x.aba.key === aba.key });
+    }
+  });
+
+  const mapa = {};
+  lista.forEach(x => {
+    let chave, ordem, label;
+    if (x.info.data) {
+      const a = x.info.data.getFullYear(), m = x.info.data.getMonth();
+      chave = `${a}-${m}`; ordem = a * 12 + m; label = `${MESES_CURTO[m]}/${String(a).slice(2)}`;
+    } else {
+      chave = 'sem'; ordem = Infinity; label = 'Sem prazo';
+    }
+    if (!mapa[chave]) mapa[chave] = { ordem, label, itens: [] };
+    mapa[chave].itens.push(x);
+  });
+  const grupos = Object.values(mapa).sort((a, b) => a.ordem - b.ordem);
+  const datasets = series.map(s => ({
+    label: s.nome,
+    data: grupos.map(g => g.itens.filter(s.pertence).length),
+    backgroundColor: s.cor, borderRadius: 4, maxBarThickness: 46
+  })).filter(ds => ds.data.some(v => v > 0));
+
+  destruir('prazosAlvo');
+  graficos.prazosAlvo = new Chart(document.getElementById('grafPrazosAlvo'), {
+    type: 'bar',
+    data: { labels: grupos.map(g => g.label), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, ticks: { precision: 0 }, grid: { color: COR_BORDA } }
+      },
+      plugins: {
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} processo${ctx.parsed.y === 1 ? '' : 's'}` } }
+      }
+    }
+  });
+
+  renderTabelaPrazos();
+}
+
 function renderGraficoAlvarasMes(dados) {
   const grupos = agruparPorMes(dados.alvaras, r => parseMesPrevisto(r['Mês Previsto Recebimento']), 'Valor a Receber', 'Situação Alvará');
   const situacoes = [...new Set(grupos.flatMap(g => Object.keys(g.series)))];
@@ -698,17 +976,21 @@ function renderGraficoAlvarasMes(dados) {
 
   const corpo = document.getElementById('corpoAlvaras');
   corpo.innerHTML = '';
+  const hoje = hojeZerado();
   const linhasOrdenadas = [...dados.alvaras].sort((a, b) => parseNumBR(b['Valor a Receber']) - parseNumBR(a['Valor a Receber']));
   linhasOrdenadas.forEach(r => {
-    const info = parseMesPrevisto(r['Mês Previsto Recebimento']);
+    const ip = infoPrazoAlvo(ABA_POR_KEY.alvaras, r, hoje);
     const situ = (r['Situação Alvará'] || '—').trim() || '—';
+    const mesCell = ip.status === 'vencido' ? `<span class="val-neg">${ip.label} ⚠</span>`
+      : (ip.status === 'hoje' || ip.status === 'd7') ? `<span style="color:var(--amarelo);font-weight:600">${ip.label}</span>`
+      : ip.label === 'Sem prazo' ? 'Sem previsão' : ip.label;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><b>${r['Cliente'] || '—'}</b><br><span style="color:var(--texto-muted);font-size:.75rem">${r['Processo'] || ''}</span></td>
       <td>${r['Réu'] || '—'}</td>
       <td>${r['Objeto do Processo'] || '—'}</td>
       <td><b>${moeda(parseNumBR(r['Valor a Receber']))}</b></td>
-      <td>${info ? labelMes(info) : 'Sem previsão'}</td>
+      <td>${mesCell}</td>
       <td><span class="tag-pct ${situ.toLowerCase() === 'recebido' ? 'verde' : situ.toLowerCase() === 'solicitado' ? 'amarelo' : 'neutro'}">${situ}</span></td>`;
     corpo.appendChild(tr);
   });
@@ -738,17 +1020,25 @@ function renderGraficoAcordosMes(dados) {
 
   const corpo = document.getElementById('corpoAcordos');
   corpo.innerHTML = '';
+  const hoje = hojeZerado();
   const linhasOrdenadas = [...dados.acordos].sort((a, b) => parseNumBR(b['Valor a Receber']) - parseNumBR(a['Valor a Receber']));
   linhasOrdenadas.forEach(r => {
+    const ip = infoPrazoAlvo(ABA_POR_KEY.acordos, r, hoje);
+    const fatalCell = ip.status === 'vencido' ? `<span class="val-neg">${ip.label} ⚠</span>`
+      : (ip.status === 'hoje' || ip.status === 'd7') ? `<span style="color:var(--amarelo);font-weight:600">${ip.label}</span>`
+      : ip.label === 'Sem prazo' ? '—' : ip.label;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><b>${r['Cliente'] || '—'}</b><br><span style="color:var(--texto-muted);font-size:.75rem">${r['Processo'] || ''}</span></td>
       <td>${r['Réu'] || '—'}</td>
       <td>${r['Objeto do Processo'] || '—'}</td>
       <td><b>${moeda(parseNumBR(r['Valor a Receber']))}</b></td>
-      <td>${r['Fatal Pgto.'] || '—'}</td>`;
+      <td>${fatalCell}</td>`;
     corpo.appendChild(tr);
   });
+  if (!linhasOrdenadas.length) {
+    corpo.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--texto-muted);padding:1.2rem">Nenhum acordo cadastrado na planilha no momento.</td></tr>`;
+  }
 }
 
 function renderValoresPorAba(dados, kpi) {
@@ -919,10 +1209,10 @@ function renderKPIs(dados, kpi) {
     cartaoKPI('Conversão de Alvarás', conversao, kpi.taxaConversaoAlvaras >= 50 ? 'verde' : 'amarelo',
       `<span><b>${kpi.alvarasRecebidos}</b> recebido${kpi.alvarasRecebidos === 1 ? '' : 's'} de <b>${kpi.alvarasSolicitados + kpi.alvarasRecebidos}</b> alvarás no total</span>`),
     cartaoKPI('A Diligenciar', kpi.diligenciar, 'amarelo', `<span>processos marcados para ação imediata</span>`),
-    cartaoKPI('Prazos Vencidos', kpi.vencidos, kpi.vencidos > 0 ? 'vermelho' : 'verde', `<span>prazos fatais já ultrapassados</span>`),
-    cartaoKPI('Vencendo em 7 Dias', kpi.aVencer7, kpi.aVencer7 > 0 ? 'amarelo' : 'verde', `<span>prazos fatais próximos do limite</span>`),
-    cartaoKPI('Alvarás sem Previsão', kpi.alvarasSemPrevisao, kpi.alvarasSemPrevisao > 0 ? 'amarelo' : 'verde',
-      `<span>${moeda(kpi.valorSemPrevisao)} sem mês de recebimento informado</span>`)
+    cartaoKPI('Prazos Vencidos', kpi.vencidos, kpi.vencidos > 0 ? 'vermelho' : 'verde', `<span>prazos alvo e fatais já ultrapassados</span>`),
+    cartaoKPI('Vencendo em 7 Dias', kpi.aVencer7, kpi.aVencer7 > 0 ? 'amarelo' : 'verde', `<span>prazos alvo e fatais próximos do limite</span>`),
+    cartaoKPI('Sem Prazo Alvo', kpi.semPrazoTotal, kpi.semPrazoTotal > 0 ? 'amarelo' : 'verde',
+      `<span>${moeda(kpi.semPrazoValor)} sem data alvo definida na planilha</span>`)
   ].join('');
 }
 
@@ -944,13 +1234,19 @@ function renderAtencao(dados, kpi) {
     itens.push(obsCard('atencao', '⏳', 'Prazos vencendo nos próximos 7 dias',
       `<b>${kpi.aVencer7} processo${kpi.aVencer7 === 1 ? '' : 's'}</b> com prazo fatal dentro de uma semana.`));
   }
+  if (kpi.alvarasAtrasados > 0) {
+    itens.push(obsCard('critico', '📜', 'Alvarás com mês previsto vencido',
+      `<b>${kpi.alvarasAtrasados}</b> alvará${kpi.alvarasAtrasados === 1 ? '' : 's'} ainda não recebido${kpi.alvarasAtrasados === 1 ? '' : 's'}, somando <b>${moeda(kpi.alvarasAtrasadosValor)}</b>, com o mês previsto de recebimento já encerrado. Verifique com o juízo e atualize a coluna <b>"Mês Previsto Recebimento"</b>.`));
+  }
   if (kpi.diligenciar > 0) {
     itens.push(obsCard('atencao', '📌', 'Processos aguardando diligência',
       `<b>${kpi.diligenciar}</b> processos estão marcados com "Diligenciar: Sim" em uma ou mais abas.`));
   }
-  if (kpi.alvarasSemPrevisao > 0) {
-    itens.push(obsCard('atencao', '🗓️', 'Alvarás sem mês de previsão',
-      `<b>${kpi.alvarasSemPrevisao}</b> alvará${kpi.alvarasSemPrevisao === 1 ? '' : 's'} (${moeda(kpi.valorSemPrevisao)}) está${kpi.alvarasSemPrevisao === 1 ? '' : 'ão'} sem a coluna <b>"Mês Previsto Recebimento"</b> preenchida. Preencha-a na planilha para habilitar a projeção mensal completa.`));
+  if (kpi.semPrazoTotal > 0) {
+    const partes = ABAS_PRAZO.filter(a => kpi.semPrazoPorAba[a.key])
+      .map(a => `<b>${a.nome}</b>: ${kpi.semPrazoPorAba[a.key].qtd}`);
+    itens.push(obsCard('atencao', '🗓️', 'Processos sem prazo alvo definido',
+      `${partes.join(' · ')} — preencha a coluna de prazo alvo dessas abas na planilha para que os processos entrem na agenda de vencimentos${kpi.semPrazoValor > 0 ? ` (${moeda(kpi.semPrazoValor)} ainda sem data prevista)` : ''}.`));
   }
 
   const valorPorReu = {};
@@ -985,8 +1281,11 @@ function renderAtencao(dados, kpi) {
    CICLO PRINCIPAL
    ========================================================================= */
 function render(dados) {
-  const kpi = calcularKPIs(dados);
+  const hoje = hojeZerado();
+  const listaPrazos = montarListaPrazos(dados, hoje);
+  const kpi = calcularKPIs(dados, listaPrazos, hoje);
   renderKPIs(dados, kpi);
+  renderPrazosAlvo(listaPrazos);
   renderGraficoAlvarasMes(dados);
   renderGraficoAcordosMes(dados);
   renderValoresPorAba(dados, kpi);
@@ -1021,6 +1320,19 @@ async function carregarDados() {
 }
 
 document.getElementById('btnAtualizar').addEventListener('click', carregarDados);
+
+document.getElementById('filtrosPrazos').addEventListener('click', ev => {
+  const btn = ev.target.closest('.chip');
+  if (!btn) return;
+  if (btn.dataset.status) {
+    FILTRO_PRAZOS.status = btn.dataset.status;
+    document.querySelectorAll('#filtrosPrazos .chip[data-status]').forEach(b => b.classList.toggle('ativo', b === btn));
+  } else if (btn.dataset.aba) {
+    FILTRO_PRAZOS.aba = btn.dataset.aba;
+    document.querySelectorAll('#filtrosPrazos .chip[data-aba]').forEach(b => b.classList.toggle('ativo', b === btn));
+  }
+  renderTabelaPrazos();
+});
 document.addEventListener('visibilitychange', () => { if (!document.hidden && DADOS) carregarDados(); });
 setInterval(() => { if (DADOS) carregarDados(); }, CONFIG.AUTO_REFRESH_MIN * 60 * 1000);
 

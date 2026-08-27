@@ -50,7 +50,8 @@ bloco `const COFRE = {…};` do `index.html` pelo texto gerado, depois é só co
 
 | Seção | Conteúdo |
 |---|---|
-| Resumo Executivo | Valor total em execução, valor e quantidade por aba, taxa de conversão de alvarás, processos a diligenciar, prazos vencidos, a vencer em 7 dias e sem prazo alvo |
+| Resumo Executivo | Valor total em execução (alvarás já recebidos fora da soma), valor e quantidade por aba, taxa de conversão de alvarás, processos a diligenciar, prazos vencidos, a vencer em 7 dias e sem prazo alvo. O cartão **Alvarás (a receber)** mostra só o pendente, com o já recebido como nota |
+| Previsão de Recebimento por Mês | Quanto está previsto entrar em cada mês: alvarás pendentes (pelo mês previsto de recebimento) + aguardando pagamento (pelo prazo fatal de pagamento da condenação). Cartões de total previsto, em atraso, mês corrente e sem data; gráfico empilhado por fonte; tabela mês a mês com acumulado |
 | Prazos Alvo — Agenda de Vencimentos | Visão consolidada dos prazos alvo das 4 abas que os têm, com cartões-resumo por aba, gráfico de processos por mês (Alvarás separado por situação) e tabela filtrável por urgência (vencidos, 7 dias, 30 dias, sem prazo) e por aba |
 | Alvarás por Mês | Soma do valor dos alvarás por mês previsto de recebimento, separada por situação (Solicitado / Recebido), com tabela de todos os processos |
 | Acordos por Mês | Soma do valor dos acordos por mês do prazo fatal de pagamento, com tabela de todos os processos |

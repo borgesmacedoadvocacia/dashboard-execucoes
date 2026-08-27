@@ -337,6 +337,32 @@
     <div class="kpis" id="kpis"></div>
   </section>
 
+  <!-- PREVISÃO DE RECEBIMENTO -->
+  <section class="secao">
+    <div class="secao-titulo">Previsão de Recebimento por Mês</div>
+    <div class="secao-sub">Quanto está previsto entrar em cada mês: <b>Alvarás pendentes</b> pelo mês previsto de recebimento + <b>Aguard. Pgto.</b> pelo prazo fatal de pagamento da condenação. Alvarás já recebidos ficam de fora.</div>
+    <div class="resumo-grid" id="resumoPrevisao"></div>
+    <div class="card">
+      <div class="grafico-box medio"><canvas id="grafPrevisaoMes"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="tabela-wrap">
+        <table id="tabelaPrevisao">
+          <thead>
+            <tr>
+              <th>Mês</th>
+              <th>Alvarás</th>
+              <th>Aguard. Pgto.</th>
+              <th>Total Previsto</th>
+              <th>Acumulado</th>
+            </tr>
+          </thead>
+          <tbody id="corpoPrevisao"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
   <!-- PRAZOS ALVO -->
   <section class="secao">
     <div class="secao-titulo">Prazos Alvo — Agenda de Vencimentos</div>
@@ -748,6 +774,16 @@ function calcularKPIs(dados, listaPrazos, hoje) {
     porAba[aba.key] = { qtd: linhas.length, valor };
   });
 
+  // Alvarás: separa o já recebido do pendente. O dashboard trabalha com o
+  // PENDENTE como valor da aba — alvará recebido não é mais dinheiro em execução.
+  const alvRecebidos = dados.alvaras.filter(r => (r['Situação Alvará'] || '').trim().toLowerCase() === 'recebido');
+  const alv = porAba.alvaras;
+  alv.valorTotal = alv.valor;
+  alv.qtdRecebido = alvRecebidos.length;
+  alv.valorRecebido = alvRecebidos.reduce((s, r) => s + parseNumBR(r['Valor a Receber']), 0);
+  alv.qtdPendente = alv.qtd - alv.qtdRecebido;
+  alv.valor = alv.valorTotal - alv.valorRecebido;
+
   const valorTotalExecucao = ABAS_FINANCEIRAS.reduce((s, a) => s + porAba[a.key].valor, 0);
   const totalProcessos = ABAS.reduce((s, a) => s + porAba[a.key].qtd, 0);
 
@@ -835,6 +871,127 @@ function corSituacaoAlvara(nome) {
   if (n === 'solicitado') return COR_AMARELO;
   if (n.includes('indefer') || n.includes('cancel')) return COR_VERMELHO;
   return COR_MUTED;
+}
+
+/** Linhas de uma aba que ainda contam como dinheiro em execução
+    (alvará já recebido fica de fora). */
+function linhasEmExecucao(aba, dados) {
+  const linhas = dados[aba.key];
+  if (aba.key !== 'alvaras') return linhas;
+  return linhas.filter(r => (r['Situação Alvará'] || '').trim().toLowerCase() !== 'recebido');
+}
+
+/* =========================================================================
+   PREVISÃO DE RECEBIMENTO POR MÊS
+   Alvarás pendentes (pelo mês previsto, contado até o fim do mês) +
+   Aguard. Pgto. (pelo prazo fatal de pagamento da condenação).
+   ========================================================================= */
+const FONTES_PREVISAO = [
+  { key: 'alvaras', nome: 'Alvarás', cor: COR_AMARELO,
+    linhas: dados => linhasEmExecucao(ABA_POR_KEY.alvaras, dados),
+    dataDe: r => { const m = parseMesPrevisto(r['Mês Previsto Recebimento']); return m ? new Date(m.ano, m.mes + 1, 0) : null; },
+    valorDe: r => parseNumBR(r['Valor a Receber']) },
+  { key: 'aguardPgto', nome: 'Aguard. Pgto.', cor: COR_CIANO,
+    linhas: dados => dados.aguardPgto,
+    dataDe: r => parseDataBR(r['Fatal Pgto.']),
+    valorDe: r => parseNumBR(r['Valor a Receber']) }
+];
+
+function montarPrevisaoMes(dados, hoje) {
+  const mapa = {};
+  const semData = { ordem: Infinity, label: 'Sem data', porFonte: {}, total: 0, qtd: 0, passado: false };
+  const resumo = { total: 0, qtdTotal: 0, atrasado: 0, qtdAtrasado: 0, esteMes: 0, qtdEsteMes: 0, semData: 0, qtdSemData: 0 };
+  const mesAtual = hoje.getFullYear() * 12 + hoje.getMonth();
+
+  FONTES_PREVISAO.forEach(f => {
+    f.linhas(dados).forEach(r => {
+      const valor = f.valorDe(r);
+      const data = f.dataDe(r);
+      if (!data) {
+        semData.porFonte[f.key] = (semData.porFonte[f.key] || 0) + valor;
+        semData.total += valor; semData.qtd++;
+        resumo.semData += valor; resumo.qtdSemData++;
+        return;
+      }
+      const a = data.getFullYear(), m = data.getMonth();
+      const chave = a * 12 + m;
+      if (!mapa[chave]) {
+        mapa[chave] = { ordem: chave, label: `${MESES_CURTO[m]}/${String(a).slice(2)}`,
+                        porFonte: {}, total: 0, qtd: 0, passado: chave < mesAtual };
+      }
+      mapa[chave].porFonte[f.key] = (mapa[chave].porFonte[f.key] || 0) + valor;
+      mapa[chave].total += valor; mapa[chave].qtd++;
+      resumo.total += valor; resumo.qtdTotal++;
+      if (data < hoje) { resumo.atrasado += valor; resumo.qtdAtrasado++; }
+      if (chave === mesAtual) { resumo.esteMes += valor; resumo.qtdEsteMes++; }
+    });
+  });
+
+  const grupos = Object.values(mapa).sort((a, b) => a.ordem - b.ordem);
+  if (semData.qtd) grupos.push(semData);
+  return { grupos, resumo };
+}
+
+function renderPrevisaoMes(dados, hoje) {
+  const { grupos, resumo } = montarPrevisaoMes(dados, hoje);
+
+  // --- Cartões-resumo ---
+  const grid = document.getElementById('resumoPrevisao');
+  const cartoes = [
+    { nome: 'Total previsto (com data)', valor: moeda(resumo.total), nota: `${resumo.qtdTotal} processo${resumo.qtdTotal === 1 ? '' : 's'} com data prevista`, cor: '' },
+    { nome: 'Em atraso', valor: moeda(resumo.atrasado), nota: `${resumo.qtdAtrasado} processo${resumo.qtdAtrasado === 1 ? '' : 's'} com data já vencida`, cor: resumo.qtdAtrasado ? 'var(--vermelho)' : '' },
+    { nome: `Este mês (${MESES_CURTO[hoje.getMonth()]}/${String(hoje.getFullYear()).slice(2)})`, valor: moeda(resumo.esteMes), nota: `${resumo.qtdEsteMes} processo${resumo.qtdEsteMes === 1 ? ' previsto' : 's previstos'} no mês corrente`, cor: '' },
+    { nome: 'Sem data definida', valor: moeda(resumo.semData), nota: `${resumo.qtdSemData} processo${resumo.qtdSemData === 1 ? '' : 's'} sem previsão na planilha`, cor: resumo.qtdSemData ? 'var(--amarelo)' : '' }
+  ];
+  grid.innerHTML = cartoes.map(c => `
+    <div class="resumo-item">
+      <div class="resumo-nome">${c.nome}</div>
+      <div class="resumo-valor"${c.cor ? ` style="color:${c.cor}"` : ''}>${c.valor}</div>
+      <div class="resumo-nota">${c.nota}</div>
+    </div>`).join('');
+
+  // --- Gráfico empilhado por fonte ---
+  destruir('previsaoMes');
+  graficos.previsaoMes = new Chart(document.getElementById('grafPrevisaoMes'), {
+    type: 'bar',
+    data: {
+      labels: grupos.map(g => g.label),
+      datasets: FONTES_PREVISAO.map(f => ({
+        label: f.nome,
+        data: grupos.map(g => g.porFonte[f.key] || 0),
+        backgroundColor: f.cor, borderRadius: 4, maxBarThickness: 46
+      })).filter(ds => ds.data.some(v => v > 0))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, ticks: { callback: v => moedaCurta(v) }, grid: { color: COR_BORDA } }
+      },
+      plugins: {
+        tooltip: { callbacks: {
+          label: ctx => `${ctx.dataset.label}: ${moeda(ctx.parsed.y)}`,
+          footer: itens => 'Total do mês: ' + moeda(itens.reduce((s, i) => s + i.parsed.y, 0))
+        } }
+      }
+    }
+  });
+
+  // --- Tabela mês a mês com acumulado ---
+  const corpo = document.getElementById('corpoPrevisao');
+  let acumulado = 0;
+  corpo.innerHTML = grupos.map(g => {
+    const comData = g.ordem !== Infinity;
+    if (comData) acumulado += g.total;
+    const badge = comData && g.passado ? ` <span class="tag-pct vermelho">vencido</span>` : '';
+    return `<tr${!comData ? ' style="opacity:.75"' : ''}>
+      <td><b>${g.label}</b> ${badge}</td>
+      <td>${g.porFonte.alvaras ? moeda(g.porFonte.alvaras) : '—'}</td>
+      <td>${g.porFonte.aguardPgto ? moeda(g.porFonte.aguardPgto) : '—'}</td>
+      <td><b>${moeda(g.total)}</b> <span style="color:var(--texto-muted);font-size:.75rem">(${g.qtd})</span></td>
+      <td>${comData ? moeda(acumulado) : '—'}</td>
+    </tr>`;
+  }).join('');
 }
 
 /* =========================================================================
@@ -1067,18 +1224,22 @@ function renderGraficoAcordosMes(dados) {
 
 function renderValoresPorAba(dados, kpi) {
   document.getElementById('subValoresAba').textContent =
-    `Soma de ${moeda(kpi.valorTotalExecucao)} distribuída entre as ${ABAS_FINANCEIRAS.length} abas com valores financeiros.`;
+    `Soma de ${moeda(kpi.valorTotalExecucao)} distribuída entre as ${ABAS_FINANCEIRAS.length} abas com valores financeiros (Alvarás: só o pendente de recebimento).`;
 
   const grid = document.getElementById('resumoAbaGrid');
   grid.innerHTML = '';
   ABAS_FINANCEIRAS.forEach(aba => {
     const info = kpi.porAba[aba.key];
+    const ehAlvaras = aba.key === 'alvaras';
+    const nota = ehAlvaras
+      ? `${info.qtdPendente} pendente${info.qtdPendente === 1 ? '' : 's'} · ${moeda(info.valorRecebido)} já recebido${info.qtdRecebido === 1 ? '' : 's'} (${info.qtdRecebido})`
+      : `${info.qtd} processo${info.qtd === 1 ? '' : 's'} · média de ${moeda(info.qtd ? info.valor / info.qtd : 0)}`;
     const div = document.createElement('div');
     div.className = 'resumo-item';
     div.innerHTML = `
-      <div class="resumo-nome">${aba.nome}</div>
+      <div class="resumo-nome">${aba.nome}${ehAlvaras ? ' (a receber)' : ''}</div>
       <div class="resumo-valor">${moeda(info.valor)}</div>
-      <div class="resumo-nota">${info.qtd} processo${info.qtd === 1 ? '' : 's'} · média de ${moeda(info.qtd ? info.valor / info.qtd : 0)}</div>`;
+      <div class="resumo-nota">${nota}</div>`;
     grid.appendChild(div);
   });
 
@@ -1173,7 +1334,7 @@ function renderObjeto(dados) {
 function renderReus(dados) {
   const valorPorReu = {};
   ABAS_FINANCEIRAS.forEach(aba => {
-    dados[aba.key].forEach(r => {
+    linhasEmExecucao(aba, dados).forEach(r => {
       const reu = (r['Réu'] || '').trim();
       if (!reu) return;
       valorPorReu[reu] = (valorPorReu[reu] || 0) + parseNumBR(r[aba.campoValor]);
@@ -1223,8 +1384,9 @@ function renderKPIs(dados, kpi) {
 
   el.innerHTML = [
     cartaoKPI('Valor Total em Execução', moeda(kpi.valorTotalExecucao), 'azul',
-      `<span>${kpi.totalProcessos} processos em acompanhamento nas ${ABAS.length} abas</span>`),
-    cartaoKPI('Alvarás', moeda(p.alvaras.valor), 'roxo', `<span><b>${p.alvaras.qtd}</b> processos</span>`),
+      `<span>${kpi.totalProcessos} processos em acompanhamento nas ${ABAS.length} abas · alvarás já recebidos fora da soma</span>`),
+    cartaoKPI('Alvarás (a receber)', moeda(p.alvaras.valor), 'roxo',
+      `<span><b>${p.alvaras.qtdPendente}</b> pendente${p.alvaras.qtdPendente === 1 ? '' : 's'} · <b>${moeda(p.alvaras.valorRecebido)}</b> já recebido${p.alvaras.qtdRecebido === 1 ? '' : 's'} (${p.alvaras.qtdRecebido})</span>`),
     cartaoKPI('Acordos', moeda(p.acordos.valor), 'roxo', `<span><b>${p.acordos.qtd}</b> processos</span>`),
     cartaoKPI('Aguardando Pagamento', moeda(p.aguardPgto.valor), 'azul', `<span><b>${p.aguardPgto.qtd}</b> processos</span>`),
     cartaoKPI('ITIV / Rec. Judicial', moeda(p.itivRecJ.valor), 'azul', `<span><b>${p.itivRecJ.qtd}</b> processos</span>`),
@@ -1274,7 +1436,7 @@ function renderAtencao(dados, kpi) {
   }
 
   const valorPorReu = {};
-  ABAS_FINANCEIRAS.forEach(aba => dados[aba.key].forEach(r => {
+  ABAS_FINANCEIRAS.forEach(aba => linhasEmExecucao(aba, dados).forEach(r => {
     const reu = (r['Réu'] || '').trim();
     if (!reu) return;
     valorPorReu[reu] = (valorPorReu[reu] || 0) + parseNumBR(r[aba.campoValor]);
@@ -1309,6 +1471,7 @@ function render(dados) {
   const listaPrazos = montarListaPrazos(dados, hoje);
   const kpi = calcularKPIs(dados, listaPrazos, hoje);
   renderKPIs(dados, kpi);
+  renderPrevisaoMes(dados, hoje);
   renderPrazosAlvo(listaPrazos);
   renderGraficoAlvarasMes(dados);
   renderGraficoAcordosMes(dados);

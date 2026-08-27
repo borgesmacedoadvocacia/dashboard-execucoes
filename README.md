@@ -58,7 +58,7 @@ bloco `const COFRE = {…};` do `index.html` pelo texto gerado, depois é só co
 | Valores por Aba | Comparativo de valor total entre Aguard. Pgto., ITIV/Rec J., Penhora, Impug. à Exec., Alvarás e Acordos |
 | Funil de Execução | Quantidade de processos em acompanhamento em cada fase, da procedência ao acordo/alvará |
 | Composição da Carteira | Distribuição dos processos por tipo de objeto de ação e maiores réus (contrapartes) por valor em execução |
-| Pontos de Atenção | Alertas gerados automaticamente: prazos vencidos, prazos vencendo em 7 dias, alvarás pendentes com mês previsto já encerrado, processos a diligenciar, processos sem prazo alvo definido, concentração por réu, processos em recuperação judicial |
+| Pontos de Atenção | Alertas gerados automaticamente: prazos alvo vencidos (o número bate com o filtro "Vencidos" da agenda), prazos vencendo em 7 dias, pagamento vencido pelo réu no ITIV/Rec J. (alerta próprio, com o valor envolvido — não entra na contagem da agenda), penhora com impugnação vencida, alvarás pendentes com mês previsto já encerrado, processos a diligenciar, processos sem prazo alvo definido, concentração por réu, processos em recuperação judicial |
 
 ## Prazos alvo por aba
 

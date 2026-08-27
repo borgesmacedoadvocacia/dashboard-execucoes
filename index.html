@@ -794,23 +794,25 @@ function calcularKPIs(dados, listaPrazos, hoje) {
     });
   });
 
-  // Vencidos / a vencer com base nos prazos alvo das 4 abas (alvará recebido não conta)
+  // Vencidos / a vencer com base nos prazos alvo das 4 abas (alvará recebido não
+  // conta). O número bate com o filtro "Vencidos" da agenda: vencido ou vence hoje.
   let vencidos = 0, aVencer7 = 0;
   listaPrazos.forEach(({ info }) => {
-    if (info.status === 'vencido') vencidos++;
-    else if (info.status === 'hoje' || info.status === 'd7') aVencer7++;
+    if (info.status === 'vencido' || info.status === 'hoje') vencidos++;
+    else if (info.status === 'd7') aVencer7++;
   });
-  // Prazos fatais fora do conceito de prazo alvo (Penhora e ITIV/Rec J.)
-  dados.penhora.forEach(r => {
+
+  // Situações fora da agenda de prazos alvo — viram alertas próprios, não
+  // entram no contador de vencidos (senão o número não bate com a pesquisa):
+  // ITIV/Rec J. com o prazo de pagamento pelo réu marcado como VENCIDO...
+  const itivVencidosLinhas = dados.itivRecJ.filter(r => (r['Prazo Fatal Pgto'] || '').trim().toUpperCase() === 'VENCIDO');
+  const itivVencidos = itivVencidosLinhas.length;
+  const itivVencidosValor = itivVencidosLinhas.reduce((s, r) => s + parseNumBR(r['Valor a Receber']), 0);
+  // ...e Penhora com o prazo fatal de impugnação já ultrapassado.
+  const penhoraVencidas = dados.penhora.filter(r => {
     const d = parseDataBR(r['Prazo Fatal Impugnação']);
-    if (!d) return;
-    const dias = Math.round((d - hoje) / 86400000);
-    if (dias < 0) vencidos++;
-    else if (dias <= 7) aVencer7++;
-  });
-  dados.itivRecJ.forEach(r => {
-    if ((r['Prazo Fatal Pgto'] || '').trim().toUpperCase() === 'VENCIDO') vencidos++;
-  });
+    return d && d < hoje;
+  }).length;
 
   const alvarasSolicitados = dados.alvaras.filter(r => (r['Situação Alvará'] || '').trim().toLowerCase() === 'solicitado').length;
   const alvarasRecebidos = dados.alvaras.filter(r => (r['Situação Alvará'] || '').trim().toLowerCase() === 'recebido').length;
@@ -835,6 +837,7 @@ function calcularKPIs(dados, listaPrazos, hoje) {
 
   return {
     porAba, valorTotalExecucao, totalProcessos, diligenciar, vencidos, aVencer7,
+    itivVencidos, itivVencidosValor, penhoraVencidas,
     alvarasSolicitados, alvarasRecebidos, taxaConversaoAlvaras,
     semPrazoPorAba, semPrazoTotal, semPrazoValor,
     alvarasAtrasados, alvarasAtrasadosValor
@@ -1395,8 +1398,8 @@ function renderKPIs(dados, kpi) {
     cartaoKPI('Conversão de Alvarás', conversao, kpi.taxaConversaoAlvaras >= 50 ? 'verde' : 'amarelo',
       `<span><b>${kpi.alvarasRecebidos}</b> recebido${kpi.alvarasRecebidos === 1 ? '' : 's'} de <b>${kpi.alvarasSolicitados + kpi.alvarasRecebidos}</b> alvarás no total</span>`),
     cartaoKPI('A Diligenciar', kpi.diligenciar, 'amarelo', `<span>processos marcados para ação imediata</span>`),
-    cartaoKPI('Prazos Vencidos', kpi.vencidos, kpi.vencidos > 0 ? 'vermelho' : 'verde', `<span>prazos alvo e fatais já ultrapassados</span>`),
-    cartaoKPI('Vencendo em 7 Dias', kpi.aVencer7, kpi.aVencer7 > 0 ? 'amarelo' : 'verde', `<span>prazos alvo e fatais próximos do limite</span>`),
+    cartaoKPI('Prazos Vencidos', kpi.vencidos, kpi.vencidos > 0 ? 'vermelho' : 'verde', `<span>prazos alvo vencidos ou vencendo hoje — o mesmo do filtro "Vencidos" da agenda</span>`),
+    cartaoKPI('Vencendo em 7 Dias', kpi.aVencer7, kpi.aVencer7 > 0 ? 'amarelo' : 'verde', `<span>prazos alvo nos próximos 7 dias</span>`),
     cartaoKPI('Sem Prazo Alvo', kpi.semPrazoTotal, kpi.semPrazoTotal > 0 ? 'amarelo' : 'verde',
       `<span>${moeda(kpi.semPrazoValor)} sem data alvo definida na planilha</span>`)
   ].join('');
@@ -1413,12 +1416,20 @@ function renderAtencao(dados, kpi) {
   const itens = [];
 
   if (kpi.vencidos > 0) {
-    itens.push(obsCard('critico', '⚠️', 'Prazos fatais vencidos',
-      `Há <b>${kpi.vencidos} processo${kpi.vencidos === 1 ? '' : 's'}</b> com prazo fatal já ultrapassado. Priorize a diligência nessas execuções.`));
+    itens.push(obsCard('critico', '⚠️', 'Prazos alvo vencidos',
+      `Há <b>${kpi.vencidos} processo${kpi.vencidos === 1 ? '' : 's'}</b> com prazo alvo já ultrapassado ou vencendo hoje. Use o filtro <b>"Vencidos"</b> na Agenda de Vencimentos para ver a lista.`));
   }
   if (kpi.aVencer7 > 0) {
     itens.push(obsCard('atencao', '⏳', 'Prazos vencendo nos próximos 7 dias',
-      `<b>${kpi.aVencer7} processo${kpi.aVencer7 === 1 ? '' : 's'}</b> com prazo fatal dentro de uma semana.`));
+      `<b>${kpi.aVencer7} processo${kpi.aVencer7 === 1 ? '' : 's'}</b> com prazo alvo dentro de uma semana.`));
+  }
+  if (kpi.itivVencidos > 0) {
+    itens.push(obsCard('atencao', '🏛️', 'Pagamento vencido pelo réu (ITIV/Rec J.)',
+      `<b>${kpi.itivVencidos} processo${kpi.itivVencidos === 1 ? '' : 's'}</b> da aba ITIV/Rec J., somando <b>${moeda(kpi.itivVencidosValor)}</b>, está${kpi.itivVencidos === 1 ? '' : 'ão'} com o prazo fatal de pagamento marcado como <b>VENCIDO</b> — o réu não pagou no prazo. Esses casos não entram na contagem de prazos vencidos da agenda; avalie as medidas de execução forçada.`));
+  }
+  if (kpi.penhoraVencidas > 0) {
+    itens.push(obsCard('atencao', '⚖️', 'Penhora com prazo de impugnação vencido',
+      `<b>${kpi.penhoraVencidas} processo${kpi.penhoraVencidas === 1 ? '' : 's'}</b> da aba Penhora com o prazo fatal de impugnação já ultrapassado.`));
   }
   if (kpi.alvarasAtrasados > 0) {
     itens.push(obsCard('critico', '📜', 'Alvarás com mês previsto vencido',

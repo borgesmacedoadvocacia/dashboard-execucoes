@@ -1425,7 +1425,7 @@ function renderAtencao(dados, kpi) {
   }
   if (kpi.itivVencidos > 0) {
     itens.push(obsCard('atencao', '🏛️', 'Pagamento vencido pelo réu (ITIV/Rec J.)',
-      `<b>${kpi.itivVencidos} processo${kpi.itivVencidos === 1 ? '' : 's'}</b> da aba ITIV/Rec J., somando <b>${moeda(kpi.itivVencidosValor)}</b>, está${kpi.itivVencidos === 1 ? '' : 'ão'} com o prazo fatal de pagamento marcado como <b>VENCIDO</b> — o réu não pagou no prazo. Esses casos não entram na contagem de prazos vencidos da agenda; avalie as medidas de execução forçada.`));
+      `<b>${kpi.itivVencidos} processo${kpi.itivVencidos === 1 ? '' : 's'}</b> da aba ITIV/Rec J., somando <b>${moeda(kpi.itivVencidosValor)}</b>, ${kpi.itivVencidos === 1 ? 'está' : 'estão'} com o prazo fatal de pagamento marcado como <b>VENCIDO</b> — o réu não pagou no prazo. Esses casos não entram na contagem de prazos vencidos da agenda; avalie as medidas de execução forçada.`));
   }
   if (kpi.penhoraVencidas > 0) {
     itens.push(obsCard('atencao', '⚖️', 'Penhora com prazo de impugnação vencido',
@@ -1462,7 +1462,7 @@ function renderAtencao(dados, kpi) {
   const recJud = dados.itivRecJ.filter(r => (r['Prazo Fatal Pgto'] || '').trim().toUpperCase() === 'REC. JUD.').length;
   if (recJud > 0) {
     itens.push(obsCard('info', 'ℹ️', 'Processos em recuperação judicial',
-      `<b>${recJud}</b> processo${recJud === 1 ? '' : 's'} da aba ITIV/Rec J. está${recJud === 1 ? '' : 'ão'} sob recuperação judicial da parte contrária, o que tende a alongar o prazo de recebimento.`));
+      `<b>${recJud}</b> processo${recJud === 1 ? '' : 's'} da aba ITIV/Rec J. ${recJud === 1 ? 'está' : 'estão'} sob recuperação judicial da parte contrária, o que tende a alongar o prazo de recebimento.`));
   }
 
   if (kpi.taxaConversaoAlvaras !== null && kpi.taxaConversaoAlvaras >= 50) {

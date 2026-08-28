@@ -274,6 +274,7 @@
     .grafico-box.medio { height: 260px; }
   }
 
+
   /* ===== BUSCA ===== */
   .busca-wrap { position: relative; flex: 1 1 260px; min-width: 220px; max-width: 420px; }
   .busca {
@@ -376,6 +377,41 @@
     .modal { max-height: 92vh; }
     .modal-campos { grid-template-columns: 1fr; }
   }
+
+  /* ===== CARTÃO KPI CLICÁVEL ===== */
+  .kpi-clicavel { cursor: pointer; transition: background .14s, border-color .14s, transform .14s; }
+  .kpi-clicavel:hover {
+    background: var(--bg3); border-color: rgba(59,130,246,.4); transform: translateY(-2px);
+  }
+  .kpi-clicavel::before {
+    content: '\21F2'; position: absolute; right: .6rem; bottom: .5rem;
+    font-size: .8rem; color: var(--texto-muted); opacity: 0; transition: opacity .14s;
+  }
+  .kpi-clicavel:hover::before { opacity: .85; }
+
+  /* ===== TABELA DENTRO DO MODAL ===== */
+  .modal-tabela-wrap { overflow-x: auto; border: 1px solid var(--borda); border-radius: 10px; }
+  .modal-tabela { width: 100%; border-collapse: collapse; font-size: .81rem; min-width: 420px; }
+  .modal-tabela thead th {
+    position: sticky; top: 0; background: var(--bg3);
+    text-align: left; padding: .55rem .7rem; font-size: .64rem;
+    text-transform: uppercase; letter-spacing: .06em; color: var(--texto-muted);
+    font-weight: 700; white-space: nowrap; border-bottom: 1px solid var(--borda);
+  }
+  .modal-tabela thead th.dir, .modal-tabela td.dir { text-align: right; }
+  .modal-tabela tbody td {
+    padding: .5rem .7rem; border-bottom: 1px solid rgba(30,45,74,.5);
+    vertical-align: top; line-height: 1.45;
+  }
+  .modal-tabela tbody tr:last-child td { border-bottom: none; }
+  .modal-tabela tbody tr:hover { background: rgba(255,255,255,.03); }
+  .modal-lista-nota { font-size: .74rem; color: var(--texto-muted); margin-top: .55rem; }
+  .modal-lista-total {
+    margin-top: .8rem; padding: .7rem .9rem; border-radius: 9px;
+    background: var(--bg3); border: 1px solid var(--borda);
+    font-size: .85rem; font-weight: 600;
+  }
+  .modal-lista-total b { color: var(--azul-claro); }
 
 </style>
 </head>
@@ -771,6 +807,79 @@ function ligarBusca(id, aoDigitar) {
   };
   el.addEventListener('input', disparar);
   limpar.addEventListener('click', () => { el.value = ''; el.focus(); disparar(); });
+}
+
+/* =========================================================================
+   LISTA DENTRO DO MODAL
+   Para quando o clique num cartão precisa mostrar "quais registros estão
+   por trás deste número".
+   ========================================================================= */
+/**
+ * abrirLista({ titulo, sub, colunas:[{r,chave,alinha,formata}], linhas:[obj],
+ *              vazio, rodape, notas:[{tipo,html}], limite })
+ */
+function abrirLista(cfg) {
+  const cols = cfg.colunas || [];
+  const linhas = cfg.linhas || [];
+  const limite = cfg.limite || 300;
+  const vis = linhas.slice(0, limite);
+
+  let html = '';
+  if (cfg.resumo && cfg.resumo.length) {
+    html += '<div class="modal-campos" style="margin-bottom:1rem">' +
+      cfg.resumo.map(c => '<div class="modal-campo">' +
+        '<div class="modal-rotulo">' + c.r + '</div>' +
+        '<div class="modal-valor ' + (c.classe || '') + '">' + c.v + '</div></div>').join('') +
+      '</div>';
+  }
+
+  if (!vis.length) {
+    html += '<div class="obs-vazio">' + (cfg.vazio || 'Nenhum registro para exibir.') + '</div>';
+  } else {
+    html += '<div class="modal-tabela-wrap"><table class="modal-tabela"><thead><tr>' +
+      cols.map(c => '<th' + (c.alinha === 'dir' ? ' class="dir"' : '') + '>' + c.r + '</th>').join('') +
+      '</tr></thead><tbody>' +
+      vis.map(l => '<tr>' + cols.map(c => {
+        const bruto = l[c.chave];
+        const v = c.formata ? c.formata(bruto, l) : (bruto === null || bruto === undefined || bruto === '' ? '—' : esc(bruto));
+        return '<td' + (c.alinha === 'dir' ? ' class="dir"' : '') + '>' + v + '</td>';
+      }).join('') + '</tr>').join('') +
+      '</tbody></table></div>';
+    if (linhas.length > vis.length) {
+      html += '<div class="modal-lista-nota">Exibindo os ' + vis.length + ' primeiros de ' +
+        linhas.length + ' registros.</div>';
+    } else {
+      html += '<div class="modal-lista-nota">' + linhas.length + ' registro' +
+        (linhas.length === 1 ? '' : 's') + '.</div>';
+    }
+  }
+
+  if (cfg.rodape) html += '<div class="modal-lista-total">' + cfg.rodape + '</div>';
+  (cfg.notas || []).forEach(n => {
+    if (n && n.html) html += '<div class="modal-nota ' + (n.tipo || '') + '">' + n.html + '</div>';
+  });
+
+  const f = document.getElementById('modalFundo');
+  document.getElementById('modalTitulo').innerHTML = cfg.titulo || '';
+  document.getElementById('modalSub').innerHTML = cfg.sub || '';
+  document.getElementById('modalCorpo').innerHTML = html;
+  f.classList.remove('oculto');
+  requestAnimationFrame(() => f.classList.add('aberto'));
+}
+
+/** Marca um cartão KPI como clicável e liga ao detalhamento. */
+function kpiClicavel(indice, aoAbrir) {
+  const cartoes = document.querySelectorAll('#kpis .kpi');
+  const el = cartoes[indice];
+  if (!el) return;
+  el.classList.add('kpi-clicavel');
+  el.title = 'Clique para ver os registros';
+  el.addEventListener('click', aoAbrir);
+}
+
+/** Liga vários cartões de uma vez: mapa {indice: função}. */
+function ligarKPIs(mapa) {
+  Object.keys(mapa).forEach(i => kpiClicavel(Number(i), mapa[i]));
 }
 
 /* =========================================================================
@@ -1695,6 +1804,174 @@ function renderKPIs(dados, kpi) {
     cartaoKPI('Sem Prazo Alvo', kpi.semPrazoTotal, kpi.semPrazoTotal > 0 ? 'amarelo' : 'verde',
       `<span>${moeda(kpi.semPrazoValor)} sem data alvo definida na planilha</span>`)
   ].join('');
+
+  ligarDetalheKPIs(dados, kpi);
+}
+
+/* =========================================================================
+   DETALHE DOS CARTÕES
+   Cada cartão abre a lista dos processos que formam aquele número.
+   ========================================================================= */
+const hojeD = () => hojeZerado();
+
+/** Linhas de uma aba, com o prazo alvo já resolvido. */
+function linhasDaAba(dados, key) {
+  const aba = ABA_POR_KEY[key];
+  const hoje = hojeD();
+  return dados[key].map(r => {
+    const info = aba.prazoAlvo ? infoPrazoAlvo(aba, r, hoje) : null;
+    return {
+      cliente: r['Cliente'] || '—',
+      processo: r['Processo'] || '',
+      reu: r['Réu'] || '—',
+      objeto: r['Objeto do Processo'] || '—',
+      valor: aba.temValor ? parseNumBR(r[aba.campoValor]) : null,
+      prazo: info ? info.label : (r['Prazo Fatal Pgto'] || '—'),
+      info, aba, r
+    };
+  });
+}
+
+const COL_CLIENTE = { r: 'Cliente / Processo', chave: 'cliente',
+  formata: (v, l) => '<b>' + esc(v) + '</b>' +
+    (l.processo ? '<br><span style="color:var(--texto-muted);font-size:.72rem">' + esc(l.processo) + '</span>' : '') };
+const COL_REU = { r: 'Réu', chave: 'reu' };
+const COL_VALOR = { r: 'Valor', chave: 'valor', alinha: 'dir',
+  formata: v => v === null ? '—' : '<b>' + moeda(v) + '</b>' };
+const COL_PRAZO = { r: 'Prazo alvo', chave: 'prazo',
+  // sem data, o rótulo e o badge diriam a mesma coisa — mostra só o badge
+  formata: (v, l) => (l.info && l.info.status === 'sem') ? badgePrazo(l.info)
+    : esc(v) + (l.info ? ' ' + badgePrazo(l.info) : '') };
+
+/** Abre a lista de uma aba inteira. */
+function abrirAba(dados, key, titulo, nota) {
+  const aba = ABA_POR_KEY[key];
+  let linhas = linhasDaAba(dados, key);
+  // alvarás já recebidos não somam no valor da aba
+  const recebidos = key === 'alvaras' ? linhas.filter(l => l.info && l.info.concluido) : [];
+  if (key === 'alvaras') linhas = linhas.filter(l => !(l.info && l.info.concluido));
+  linhas.sort((a, b) => (b.valor || 0) - (a.valor || 0));
+  const soma = linhas.reduce((s, l) => s + (l.valor || 0), 0);
+  const cols = [COL_CLIENTE, COL_REU];
+  if (aba.temValor) cols.push(COL_VALOR);
+  if (aba.prazoAlvo || key === 'itivRecJ') cols.push(COL_PRAZO);
+
+  abrirLista({
+    titulo: titulo || aba.nome,
+    sub: linhas.length + ' processo' + (linhas.length === 1 ? '' : 's') +
+         (aba.temValor ? ' · ' + moeda(soma) : ''),
+    colunas: cols, linhas,
+    rodape: aba.temValor ? 'Total da aba: <b>' + moeda(soma) + '</b>' : null,
+    notas: [
+      nota ? { tipo: '', html: nota } : null,
+      recebidos.length ? { tipo: '', html: '<b>' + recebidos.length + '</b> alvará(s) já recebido(s), somando <b>' +
+        moeda(recebidos.reduce((s, l) => s + (l.valor || 0), 0)) + '</b>, ficam fora desta lista e do valor da aba.' } : null
+    ].filter(Boolean)
+  });
+}
+
+function ligarDetalheKPIs(dados, kpi) {
+  const hoje = hojeD();
+  const todasComValor = ABAS_FINANCEIRAS.flatMap(a => {
+    const l = linhasDaAba(dados, a.key).map(x => Object.assign(x, { abaNome: a.nome }));
+    return a.key === 'alvaras' ? l.filter(x => !(x.info && x.info.concluido)) : l;
+  }).sort((a, b) => (b.valor || 0) - (a.valor || 0));
+
+  ligarKPIs({
+    0: () => abrirLista({
+      titulo: 'Valor Total em Execução',
+      sub: todasComValor.length + ' processos com valor, nas ' + ABAS_FINANCEIRAS.length + ' abas financeiras',
+      colunas: [COL_CLIENTE, { r: 'Aba', chave: 'abaNome' }, COL_REU, COL_VALOR],
+      linhas: todasComValor,
+      rodape: 'Total em execução: <b>' + moeda(kpi.valorTotalExecucao) + '</b>',
+      notas: [{ tipo: '', html: 'Alvarás já recebidos não entram nesta soma — deixaram de ser valor em execução.' }]
+    }),
+    1: () => abrirAba(dados, 'alvaras', 'Alvarás (a receber)'),
+    2: () => abrirAba(dados, 'acordos', 'Acordos'),
+    3: () => abrirAba(dados, 'aguardPgto', 'Aguardando Pagamento',
+      'Condenações já transitadas em que o réu foi ou será intimado a pagar. O prazo alvo é o Fatal Pgto.'),
+    4: () => abrirAba(dados, 'itivRecJ', 'ITIV / Recuperação Judicial',
+      'Prazo "VENCIDO" significa que o réu não pagou no prazo — exige execução forçada.'),
+    5: () => abrirAba(dados, 'penhora', 'Penhora (a bloquear)'),
+    6: () => abrirAba(dados, 'impugExec', 'Impugnação à Execução'),
+    7: () => {
+      const l = linhasDaAba(dados, 'alvaras');
+      abrirLista({
+        titulo: 'Conversão de Alvarás',
+        sub: kpi.alvarasRecebidos + ' recebidos de ' + (kpi.alvarasSolicitados + kpi.alvarasRecebidos) + ' alvarás',
+        colunas: [COL_CLIENTE, COL_VALOR,
+          { r: 'Situação', chave: 'info', formata: i => i && i.situacao
+            ? '<span class="tag-pct ' + (i.concluido ? 'verde' : 'amarelo') + '">' + esc(i.situacao) + '</span>' : '—' },
+          COL_PRAZO],
+        linhas: l.sort((a, b) => (a.info && a.info.concluido ? 1 : 0) - (b.info && b.info.concluido ? 1 : 0)),
+        rodape: 'Recebido: <b>' + moeda(kpi.porAba.alvaras.valorRecebido) +
+                '</b> · ainda a receber: <b>' + moeda(kpi.porAba.alvaras.valor) + '</b>'
+      });
+    },
+    8: () => {
+      const l = ABAS.flatMap(a => linhasDaAba(dados, a.key)
+        .map(x => Object.assign(x, { abaNome: a.nome })))
+        .filter(x => (x.r['Diligenciar'] || '').trim().toLowerCase() === 'sim')
+        .sort((a, b) => (b.valor || 0) - (a.valor || 0));
+      abrirLista({
+        titulo: 'Processos a Diligenciar',
+        sub: l.length + ' processos marcados com "Diligenciar: Sim"',
+        colunas: [COL_CLIENTE, { r: 'Aba', chave: 'abaNome' }, COL_VALOR, COL_PRAZO],
+        linhas: l,
+        rodape: 'Valor envolvido: <b>' + moeda(l.reduce((s, x) => s + (x.valor || 0), 0)) + '</b>'
+      });
+    },
+    9: () => {
+      const l = LISTA_PRAZOS.filter(x => x.info.status === 'vencido' || x.info.status === 'hoje')
+        .map(x => ({
+          cliente: x.r['Cliente'] || '—', processo: x.r['Processo'] || '',
+          reu: x.r['Réu'] || '—', abaNome: x.aba.nome,
+          valor: x.aba.temValor ? parseNumBR(x.r[x.aba.campoValor]) : null,
+          prazo: x.info.label, info: x.info
+        }));
+      abrirLista({
+        titulo: 'Prazos Vencidos',
+        sub: l.length + ' processo(s) com prazo alvo vencido ou vencendo hoje',
+        colunas: [COL_CLIENTE, { r: 'Aba', chave: 'abaNome' }, COL_VALOR, COL_PRAZO],
+        linhas: l, vazio: 'Nenhum prazo alvo vencido. ',
+        rodape: 'Valor envolvido: <b>' + moeda(l.reduce((s, x) => s + (x.valor || 0), 0)) + '</b>',
+        notas: [{ tipo: 'critico', html: 'Mesma lista do filtro <b>"Vencidos"</b> na Agenda de Vencimentos.' }]
+      });
+    },
+    10: () => {
+      const l = LISTA_PRAZOS.filter(x => x.info.status === 'd7')
+        .map(x => ({
+          cliente: x.r['Cliente'] || '—', processo: x.r['Processo'] || '',
+          reu: x.r['Réu'] || '—', abaNome: x.aba.nome,
+          valor: x.aba.temValor ? parseNumBR(x.r[x.aba.campoValor]) : null,
+          prazo: x.info.label, info: x.info
+        })).sort((a, b) => a.info.dias - b.info.dias);
+      abrirLista({
+        titulo: 'Vencendo em 7 Dias',
+        sub: l.length + ' processo(s) com prazo alvo na próxima semana',
+        colunas: [COL_CLIENTE, { r: 'Aba', chave: 'abaNome' }, COL_VALOR, COL_PRAZO],
+        linhas: l, vazio: 'Nenhum prazo alvo vencendo nos próximos 7 dias.',
+        rodape: 'Valor envolvido: <b>' + moeda(l.reduce((s, x) => s + (x.valor || 0), 0)) + '</b>'
+      });
+    },
+    11: () => {
+      const l = LISTA_PRAZOS.filter(x => x.info.status === 'sem')
+        .map(x => ({
+          cliente: x.r['Cliente'] || '—', processo: x.r['Processo'] || '',
+          reu: x.r['Réu'] || '—', abaNome: x.aba.nome,
+          valor: x.aba.temValor ? parseNumBR(x.r[x.aba.campoValor]) : null,
+          prazo: x.aba.prazoAlvo ? x.aba.prazoAlvo.rotulo + ' em branco' : '—'
+        })).sort((a, b) => (b.valor || 0) - (a.valor || 0));
+      abrirLista({
+        titulo: 'Sem Prazo Alvo Definido',
+        sub: l.length + ' processo(s) sem data alvo preenchida na planilha',
+        colunas: [COL_CLIENTE, { r: 'Aba', chave: 'abaNome' }, COL_VALOR, { r: 'Falta', chave: 'prazo' }],
+        linhas: l, vazio: 'Todos os processos têm prazo alvo definido.',
+        rodape: 'Valor sem data prevista: <b>' + moeda(kpi.semPrazoValor) + '</b>',
+        notas: [{ tipo: 'alerta', html: 'Sem data alvo, estes processos <b>não entram na agenda de vencimentos</b> — ficam invisíveis no controle de prazos.' }]
+      });
+    }
+  });
 }
 
 /* =========================================================================
